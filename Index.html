@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ScaleWithLakshya Outreach CRM</title>
+    <?!= include('Stylesheet'); ?>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">S</div>
+          <div>
+            <p class="brand-name">ScaleWithLakshya</p>
+            <p class="brand-subtitle">Outreach CRM</p>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item is-active" type="button" aria-current="page">Dashboard</button>
+          <button class="nav-item" type="button">Leads</button>
+          <button class="nav-item" type="button">Follow-ups</button>
+          <button class="nav-item" type="button">Settings</button>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">CRM foundation</p>
+            <h1>Dashboard</h1>
+          </div>
+          <button class="secondary-button" id="retry-health-check" type="button">Retry health check</button>
+        </header>
+
+        <section class="status-section" aria-labelledby="health-title">
+          <div class="section-heading">
+            <h2 id="health-title">Application Status</h2>
+            <span class="status-badge" id="status-badge">Checking</span>
+          </div>
+
+          <div class="loading-state" id="loading-state" role="status" aria-live="polite">
+            Checking Apps Script connection...
+          </div>
+
+          <div class="error-state is-hidden" id="error-state" role="alert">
+            The application health check failed. Please try again or review the Apps Script execution logs.
+          </div>
+
+          <dl class="health-details is-hidden" id="health-details" aria-live="polite">
+            <div>
+              <dt>Application</dt>
+              <dd id="health-app">-</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd id="health-version">-</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd id="health-success">-</dd>
+            </div>
+            <div>
+              <dt>Server timestamp</dt>
+              <dd id="health-timestamp">-</dd>
+            </div>
+          </dl>
+        </section>
+      </main>
+    </div>
+
+    <?!= include('JavaScript'); ?>
+  </body>
+</html>
