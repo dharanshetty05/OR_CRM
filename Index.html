@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-neutral-50">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ScaleWithLakshya Outreach CRM</title>
-  <meta name="description" content="Private, browser-only Outreach CRM for ScaleWithLakshya powered directly by Google Sheets.">
-  
+  <meta name="description"
+    content="Private, local-first Outreach CRM for ScaleWithLakshya. Fast, simple, offline-first lead and Instagram DM management.">
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -31,26 +33,43 @@
     }
   </script>
 
-  <!-- Google Identity Services -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
   <!-- Custom CSS -->
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="h-full flex flex-col antialiased text-neutral-900 bg-[#fbfbfa]">
 
-  <!-- Top App Bar on Mobile / Layout Container -->
+  <!-- Startup Loading Overlay -->
+  <div id="app-loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 hidden">
+    <div class="flex flex-col items-center max-w-sm text-center">
+      <div class="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-md mb-4 animate-pulse">
+        SWL
+      </div>
+      <h3 class="text-lg font-bold text-neutral-900 mb-1">ScaleWithLakshya CRM</h3>
+      <p id="app-loading-text" class="text-xs text-neutral-500 font-medium flex items-center justify-center gap-2">
+        <svg class="w-4 h-4 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Opening local CRM database...</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Layout Container -->
   <div class="flex h-full overflow-hidden">
 
     <!-- ==================================================================== -->
     <!--                               SIDEBAR                                -->
     <!-- ==================================================================== -->
-    <aside id="app-sidebar" class="w-64 flex-shrink-0 bg-white border-r border-neutral-200 flex flex-col justify-between hidden md:flex z-20">
+    <aside id="app-sidebar"
+      class="w-64 flex-shrink-0 bg-white border-r border-neutral-200 flex flex-col justify-between hidden md:flex z-20">
       <div>
         <!-- App Branding -->
         <div class="h-16 flex items-center px-6 border-b border-neutral-200">
           <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+            <div
+              class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
               SWL
             </div>
             <div>
@@ -62,7 +81,8 @@
 
         <!-- Navigation Links -->
         <nav class="p-3 space-y-1">
-          <button id="nav-dashboard" onclick="app.switchView('dashboard')" class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
+          <button id="nav-dashboard" onclick="app.switchView('dashboard')"
+            class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="7" height="7" rx="1" />
               <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -72,29 +92,36 @@
             <span>Dashboard</span>
           </button>
 
-          <button id="nav-leads" onclick="app.switchView('leads')" class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
+          <button id="nav-leads" onclick="app.switchView('leads')"
+            class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <div class="flex items-center gap-3">
               <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               <span>Leads</span>
             </div>
-            <span id="nav-leads-count" class="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-semibold">0</span>
+            <span id="nav-leads-count"
+              class="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-full font-semibold">0</span>
           </button>
 
-          <button id="nav-followups" onclick="app.switchView('followups')" class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
+          <button id="nav-followups" onclick="app.switchView('followups')"
+            class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <div class="flex items-center gap-3">
               <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>Follow-ups</span>
             </div>
-            <span id="nav-overdue-count" class="hidden text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">0</span>
+            <span id="nav-overdue-count"
+              class="hidden text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">0</span>
           </button>
 
-          <button id="nav-settings" onclick="app.switchView('settings')" class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
+          <button id="nav-settings" onclick="app.switchView('settings')"
+            class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span>Settings</span>
@@ -102,13 +129,13 @@
         </nav>
       </div>
 
-      <!-- Footer Database Connection Status -->
+      <!-- Footer Local DB Status -->
       <div class="p-4 border-t border-neutral-200 bg-neutral-50/50">
         <div id="sidebar-db-status" class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <div class="truncate text-xs">
-            <span class="font-medium text-neutral-900 block truncate" id="sidebar-sheet-title">CRM Sheet</span>
-            <span class="text-neutral-500 block truncate text-[11px]" id="sidebar-auth-status">Authorized</span>
+            <span class="font-medium text-neutral-900 block truncate">IndexedDB Active</span>
+            <span class="text-neutral-500 block truncate text-[11px]">Personal Single-User</span>
           </div>
         </div>
       </div>
@@ -117,19 +144,32 @@
     <!-- Mobile Navigation Bar -->
     <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex justify-around py-2 z-30">
       <button onclick="app.switchView('dashboard')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+        </svg>
         <span>Home</span>
       </button>
       <button onclick="app.switchView('leads')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
         <span>Leads</span>
       </button>
       <button onclick="app.switchView('followups')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
         <span>Follow-ups</span>
       </button>
       <button onclick="app.switchView('settings')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/></svg>
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        </svg>
         <span>Settings</span>
       </button>
     </div>
@@ -140,71 +180,6 @@
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto pb-16 md:pb-0">
 
       <!-- ================================================================== -->
-      <!--                         SETUP SCREEN VIEW                          -->
-      <!-- ================================================================== -->
-      <section id="view-setup" class="hidden min-h-full flex items-center justify-center p-6">
-        <div class="w-full max-w-lg bg-white rounded-xl border border-neutral-200 shadow-sm p-8">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
-              SWL
-            </div>
-            <div>
-              <h2 class="text-xl font-bold text-neutral-900">Connect your CRM database</h2>
-              <p class="text-sm text-neutral-500">Connect a Google Sheet to use as your private CRM database.</p>
-            </div>
-          </div>
-
-          <!-- Authentication Status -->
-          <div class="mb-6 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <p class="text-xs font-semibold text-neutral-700 uppercase tracking-wide">Google Authorization</p>
-                <p class="text-[11px] text-neutral-500 mt-1 leading-relaxed">
-                  Your Google permission is handled by Google Identity Services. OAuth tokens are kept in memory and are never stored in browser storage.
-                </p>
-              </div>
-              <span id="setup-auth-badge" class="text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 font-medium shrink-0">Checking</span>
-            </div>
-          </div>
-
-          <!-- Step 1: Google Authorization -->
-          <div class="mb-6">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-neutral-900">1. Google Authorization</span>
-              <span class="text-xs text-neutral-400">Required once</span>
-            </div>
-            <button id="btn-setup-signin" onclick="app.handleGoogleSignIn()" class="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-neutral-300 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors shadow-sm">
-              <svg class="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-              </svg>
-              <span>Sign in with Google</span>
-            </button>
-          </div>
-
-          <!-- Step 2: Google Sheet URL Input -->
-          <div class="mb-6">
-            <label for="setup-sheet-url" class="block text-sm font-medium text-neutral-900 mb-1.5">2. Google Sheet URL</label>
-            <input type="url" id="setup-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit" class="w-full text-sm px-3.5 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-neutral-900" />
-            <p class="text-xs text-neutral-500 mt-1.5">Paste the link of your private Google Sheet. The CRM will configure the required schema automatically.</p>
-          </div>
-
-          <!-- Connect Button -->
-          <button id="btn-setup-connect" onclick="app.handleConnectSheet()" disabled class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:bg-neutral-200 disabled:text-neutral-400 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg shadow-sm transition-colors">
-            <span id="setup-connect-text">Connect Sheet</span>
-          </button>
-
-          <div id="setup-status-message" class="hidden mt-4 p-3 rounded-lg text-xs leading-relaxed"></div>
-
-          <div class="mt-6 pt-5 border-t border-neutral-100 text-xs text-neutral-500 text-center leading-relaxed">
-            Your leads and outreach history stay in your Google Sheet. You normally won't need to open or edit it manually.
-          </div>
-        </div>
-      </section>
-
-      <!-- ================================================================== -->
       <!--                           DASHBOARD VIEW                           -->
       <!-- ================================================================== -->
       <section id="view-dashboard" class="p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
@@ -212,69 +187,60 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-2xl font-bold text-neutral-900">Dashboard</h2>
-            <p class="text-sm text-neutral-500">Real-time overview of your private sales pipeline.</p>
+            <p class="text-sm text-neutral-500">Real-time overview of your Instagram DM outreach & lead pipeline.</p>
           </div>
           <div class="flex items-center gap-3">
-            <button onclick="app.refreshData()" class="flex items-center gap-2 px-3.5 py-2 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 shadow-sm transition-colors">
-              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <button onclick="app.refreshData()"
+              class="flex items-center gap-2 px-3.5 py-2 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 shadow-sm transition-colors">
+              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
               <span>Refresh</span>
             </button>
-            <button onclick="app.openAddLeadModal()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <button onclick="app.openAddLeadModal()"
+              class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
               <span>Add Lead</span>
             </button>
           </div>
         </div>
 
-        <!-- Operational Metrics Grid -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          <div class="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-xs font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Leads</span>
-            <span id="metric-total-leads" class="text-2xl font-bold text-neutral-900">0</span>
+        <!-- Primary Metrics Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Leads</span>
+            <span id="metric-total-leads" class="text-xl font-bold text-neutral-900">0</span>
           </div>
-          <div class="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-xs font-medium text-neutral-500 uppercase tracking-wider block mb-1">New</span>
-            <span id="metric-new" class="text-2xl font-bold text-neutral-900">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Not Contacted</span>
+            <span id="metric-not-contacted" class="text-xl font-bold text-neutral-900">0</span>
           </div>
-          <div class="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-xs font-medium text-neutral-500 uppercase tracking-wider block mb-1">Ready to Contact</span>
-            <span id="metric-ready" class="text-2xl font-bold text-neutral-900">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-purple-200 bg-purple-50/20 shadow-sm">
+            <span class="text-[11px] font-semibold text-purple-700 uppercase tracking-wider block mb-1">DM Sent</span>
+            <span id="metric-dm-sent" class="text-xl font-bold text-purple-700">0</span>
           </div>
-          <div class="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-xs font-medium text-neutral-500 uppercase tracking-wider block mb-1">Contacted</span>
-            <span id="metric-contacted" class="text-2xl font-bold text-neutral-900">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-blue-200 bg-blue-50/20 shadow-sm">
+            <span class="text-[11px] font-semibold text-blue-700 uppercase tracking-wider block mb-1">Replied</span>
+            <span id="metric-replied" class="text-xl font-bold text-blue-700">0</span>
           </div>
-          <div class="bg-white p-4 rounded-xl border border-red-200 bg-red-50/20 shadow-sm">
-            <span class="text-xs font-semibold text-red-600 uppercase tracking-wider block mb-1">Overdue Follow-ups</span>
-            <span id="metric-overdue" class="text-2xl font-bold text-red-600">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-red-200 bg-red-50/20 shadow-sm">
+            <span class="text-[11px] font-semibold text-red-600 uppercase tracking-wider block mb-1">Overdue</span>
+            <span id="metric-overdue" class="text-xl font-bold text-red-600">0</span>
           </div>
-          <div class="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-sm">
-            <span class="text-xs font-semibold text-amber-700 uppercase tracking-wider block mb-1">Due Today</span>
-            <span id="metric-due-today" class="text-2xl font-bold text-amber-700">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-sm">
+            <span class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block mb-1">Due Today</span>
+            <span id="metric-due-today" class="text-xl font-bold text-amber-700">0</span>
           </div>
-        </div>
-
-        <!-- Secondary Pipeline Metrics -->
-        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
-          <div class="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-sm">
-            <span class="text-xs text-neutral-500 font-medium block">Replies</span>
-            <span id="metric-replies" class="text-lg font-bold text-neutral-900">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-sm">
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block mb-1">Calls Booked</span>
+            <span id="metric-calls-booked" class="text-xl font-bold text-emerald-700">0</span>
           </div>
-          <div class="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-sm">
-            <span class="text-xs text-neutral-500 font-medium block">Calls Booked</span>
-            <span id="metric-calls-booked" class="text-lg font-bold text-neutral-900">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-sm">
-            <span class="text-xs text-neutral-500 font-medium block">Proposals Sent</span>
-            <span id="metric-proposals" class="text-lg font-bold text-neutral-900">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/30 shadow-sm">
-            <span class="text-xs text-emerald-800 font-semibold block">Won</span>
-            <span id="metric-won" class="text-lg font-bold text-emerald-700">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-sm">
-            <span class="text-xs text-neutral-500 font-medium block">Lost</span>
-            <span id="metric-lost" class="text-lg font-bold text-neutral-900">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-emerald-300 bg-emerald-100/30 shadow-sm">
+            <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Won</span>
+            <span id="metric-won" class="text-xl font-bold text-emerald-800">0</span>
           </div>
         </div>
 
@@ -285,12 +251,14 @@
           <div class="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col">
             <div class="p-5 border-b border-neutral-200 flex items-center justify-between">
               <div>
-                <h3 class="text-base font-semibold text-neutral-900">Action Required: Follow-ups</h3>
-                <p class="text-xs text-neutral-500">Overdue outreach and follow-ups due today.</p>
+                <h3 class="text-base font-semibold text-neutral-900">Today's Outreach & Follow-ups</h3>
+                <p class="text-xs text-neutral-500">Prospects requiring outreach or follow-up today.</p>
               </div>
-              <button onclick="app.switchView('followups')" class="text-xs font-semibold text-brand-600 hover:text-brand-700">View All &rarr;</button>
+              <button onclick="app.switchView('followups')"
+                class="text-xs font-semibold text-brand-600 hover:text-brand-700">View All &rarr;</button>
             </div>
-            <div id="dashboard-urgent-followups" class="p-4 divide-y divide-neutral-100 flex-1 overflow-y-auto max-h-96">
+            <div id="dashboard-urgent-followups"
+              class="p-4 divide-y divide-neutral-100 flex-1 overflow-y-auto max-h-96">
               <!-- Dynamically populated -->
             </div>
           </div>
@@ -299,8 +267,8 @@
           <div class="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col">
             <div class="p-5 border-b border-neutral-200 flex items-center justify-between">
               <div>
-                <h3 class="text-base font-semibold text-neutral-900">Recent Activity</h3>
-                <p class="text-xs text-neutral-500">Latest outreach touchpoints and updates.</p>
+                <h3 class="text-base font-semibold text-neutral-900">Recent Outreach Touchpoints</h3>
+                <p class="text-xs text-neutral-500">Latest DMs, replies, and activity logs.</p>
               </div>
             </div>
             <div id="dashboard-recent-activity" class="p-4 divide-y divide-neutral-100 flex-1 overflow-y-auto max-h-96">
@@ -319,15 +287,14 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-2xl font-bold text-neutral-900">Leads</h2>
-            <p class="text-sm text-neutral-500">Search, filter, and manage your prospect database.</p>
+            <p class="text-sm text-neutral-500">Manage, search, and execute Instagram outreach for your prospects.</p>
           </div>
           <div class="flex items-center gap-3">
-            <button onclick="app.refreshData()" class="flex items-center gap-2 px-3.5 py-2 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 shadow-sm transition-colors">
-              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span>Refresh</span>
-            </button>
-            <button onclick="app.openAddLeadModal()" class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <button onclick="app.openAddLeadModal()"
+              class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
               <span>Add Lead</span>
             </button>
           </div>
@@ -338,25 +305,34 @@
           <!-- Search Bar -->
           <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
             </div>
-            <input type="text" id="leads-search" placeholder="Search leads by business, contact, niche, location, email, website, phone..." class="w-full pl-10 pr-4 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" oninput="app.handleSearchChange(this.value)">
+            <input type="text" id="leads-search"
+              placeholder="Search leads by business, contact, niche, location, instagram, website, phone..."
+              class="w-full pl-10 pr-4 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              oninput="app.handleSearchChange(this.value)">
           </div>
 
           <!-- Filters Row -->
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
             <!-- Status Filter -->
-            <select id="filter-status" onchange="app.handleFilterChange()" class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <select id="filter-status" onchange="app.handleFilterChange()"
+              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Statuses</option>
             </select>
 
             <!-- Niche Filter -->
-            <select id="filter-niche" onchange="app.handleFilterChange()" class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <select id="filter-niche" onchange="app.handleFilterChange()"
+              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Niches</option>
             </select>
 
             <!-- Tier Filter -->
-            <select id="filter-tier" onchange="app.handleFilterChange()" class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <select id="filter-tier" onchange="app.handleFilterChange()"
+              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Tiers</option>
               <option value="A">Tier A</option>
               <option value="B">Tier B</option>
@@ -364,13 +340,15 @@
             </select>
 
             <!-- Lead Source Filter -->
-            <select id="filter-source" onchange="app.handleFilterChange()" class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
+            <select id="filter-source" onchange="app.handleFilterChange()"
+              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Sources</option>
             </select>
 
             <!-- Follow-up State Filter -->
-            <select id="filter-followup" onchange="app.handleFilterChange()" class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
-              <option value="">All Follow-up States</option>
+            <select id="filter-followup" onchange="app.handleFilterChange()"
+              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
+              <option value="">All Follow-ups</option>
               <option value="overdue">Overdue</option>
               <option value="today">Due Today</option>
               <option value="upcoming">Upcoming</option>
@@ -378,7 +356,8 @@
             </select>
 
             <!-- Clear Filters Button -->
-            <button onclick="app.clearFilters()" class="text-xs font-medium text-neutral-600 hover:text-neutral-900 border border-neutral-300 rounded-md px-3 py-1.5 bg-white hover:bg-neutral-50 transition-colors">
+            <button onclick="app.clearFilters()"
+              class="text-xs font-medium text-neutral-600 hover:text-neutral-900 border border-neutral-300 rounded-md px-3 py-1.5 bg-white hover:bg-neutral-50 transition-colors">
               Clear Filters
             </button>
           </div>
@@ -393,9 +372,9 @@
                   <th scope="col" class="px-5 py-3.5">Business</th>
                   <th scope="col" class="px-4 py-3.5">Location</th>
                   <th scope="col" class="px-4 py-3.5">Niche</th>
+                  <th scope="col" class="px-4 py-3.5">Instagram / Outreach</th>
                   <th scope="col" class="px-4 py-3.5">Status</th>
                   <th scope="col" class="px-3 py-3.5 text-center">Tier</th>
-                  <th scope="col" class="px-3 py-3.5 text-center">Score</th>
                   <th scope="col" class="px-4 py-3.5">Next Follow-up</th>
                   <th scope="col" class="px-4 py-3.5">Last Contacted</th>
                 </tr>
@@ -409,7 +388,7 @@
           <!-- Table Footer Info -->
           <div class="p-3.5 border-t border-neutral-200 bg-neutral-50 text-xs text-neutral-500 flex justify-between items-center">
             <span id="leads-table-summary">Showing 0 leads</span>
-            <span class="text-neutral-400">Click any row to open lead detail</span>
+            <span class="text-neutral-400">Click any row to open lead profile & DM touchpoints</span>
           </div>
         </div>
       </section>
@@ -423,15 +402,8 @@
             <h2 class="text-2xl font-bold text-neutral-900">Follow-up Desk</h2>
             <p class="text-sm text-neutral-500">Organized execution queue to keep deals moving forward.</p>
           </div>
-          <div class="flex items-center gap-3">
-            <button onclick="app.refreshData()" class="flex items-center gap-2 px-3.5 py-2 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 shadow-sm transition-colors">
-              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span>Refresh</span>
-            </button>
-          </div>
         </div>
 
-        <!-- Follow-up Section Tabs / Groups -->
         <div class="space-y-6">
 
           <!-- 1. OVERDUE -->
@@ -498,73 +470,93 @@
       <!-- ================================================================== -->
       <section id="view-settings" class="hidden p-6 md:p-8 space-y-6 max-w-4xl mx-auto w-full">
         <div>
-          <h2 class="text-2xl font-bold text-neutral-900">Settings</h2>
-          <p class="text-sm text-neutral-500">Manage database connection and application configurations.</p>
+          <h2 class="text-2xl font-bold text-neutral-900">Settings & Data Management</h2>
+          <p class="text-sm text-neutral-500">Manage local storage, database backups, and import/export operations.</p>
         </div>
 
         <div class="space-y-6">
-          <!-- Google Auth Status Card -->
+          <!-- Local Database Status Card -->
           <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
               <div>
-                <h3 class="text-base font-semibold text-neutral-900">Google Account Authorization</h3>
-                <p class="text-xs text-neutral-500">The CRM accesses your private Sheet through Google Identity Services.</p>
+                <h3 class="text-base font-semibold text-neutral-900">Local Database Engine</h3>
+                <p class="text-xs text-neutral-500">Data is stored directly in your browser's IndexedDB database.</p>
               </div>
-              <span id="settings-auth-badge" class="text-xs px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-700 font-medium">Checking</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">IndexedDB Active</span>
             </div>
-            <div class="flex items-center gap-3">
-              <button onclick="app.handleGoogleSignIn(true)" class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 transition-colors">
-                Reconnect Google
+
+            <div class="grid grid-cols-3 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-200 text-xs">
+              <div>
+                <span class="text-neutral-500 block">Total Leads</span>
+                <span id="settings-total-leads" class="font-bold text-neutral-900 text-sm">0</span>
+              </div>
+              <div>
+                <span class="text-neutral-500 block">Active Prospects</span>
+                <span id="settings-active-leads" class="font-bold text-neutral-900 text-sm">0</span>
+              </div>
+              <div>
+                <span class="text-neutral-500 block">Touchpoints Logged</span>
+                <span id="settings-total-activities" class="font-bold text-neutral-900 text-sm">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backup & Data Export Card -->
+          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-4">
+            <div>
+              <h3 class="text-base font-semibold text-neutral-900">Data Backup & Export</h3>
+              <p class="text-xs text-neutral-500">Export your complete CRM database for safe offline backup or transfer.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button onclick="app.exportJsonBackup()"
+                class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>Export Full Backup (JSON)</span>
+              </button>
+
+              <button onclick="app.exportCsvLeads()"
+                class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Export Leads (CSV)</span>
               </button>
             </div>
           </div>
 
-          <!-- Connected Spreadsheet Card -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="text-base font-semibold text-neutral-900">Connected Google Sheet</h3>
-                <p class="text-xs text-neutral-500">Your canonical private CRM database.</p>
-              </div>
-              <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">Active</span>
-            </div>
-
-            <div class="space-y-3 bg-neutral-50 p-4 rounded-lg border border-neutral-200 mb-5">
-              <div>
-                <span class="text-[11px] font-semibold uppercase text-neutral-500">Sheet Name</span>
-                <p id="settings-sheet-name" class="text-sm font-medium text-neutral-900">CRM Sheet</p>
-              </div>
-              <div>
-                <span class="text-[11px] font-semibold uppercase text-neutral-500">Spreadsheet ID</span>
-                <p id="settings-sheet-id" class="text-xs font-mono text-neutral-700 break-all">-</p>
-              </div>
-              <div>
-                <a id="settings-sheet-link" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">
-                  <span>Open Sheet in Google Drive</span>
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                </a>
-              </div>
+          <!-- Import Data Card -->
+          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-4">
+            <div>
+              <h3 class="text-base font-semibold text-neutral-900">Import Data</h3>
+              <p class="text-xs text-neutral-500">Restore a previous JSON backup file or import leads from a CSV spreadsheet.</p>
             </div>
 
             <div class="flex items-center gap-3">
-              <button onclick="app.disconnectSpreadsheet()" class="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors">
-                Change Spreadsheet
+              <input type="file" id="input-import-file" accept=".json,.csv" class="hidden" onchange="app.handleImportFile(event)">
+              <button onclick="document.getElementById('input-import-file').click()"
+                class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>Select JSON / CSV File to Import</span>
               </button>
             </div>
           </div>
 
-          <!-- Authentication Security Card -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold text-neutral-900 mb-1">Google Connection</h3>
-            <p class="text-xs text-neutral-500 mb-4">
-              Google handles authorization. The CRM keeps access tokens in memory only and does not store reusable Google credentials in browser storage.
-            </p>
-            <button onclick="app.handleGoogleSignIn(false)" class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 transition-colors">
-              Reconnect Google
+          <!-- Danger Zone: Clear Data -->
+          <div class="bg-white rounded-xl border border-red-200 shadow-sm p-6 space-y-3 bg-red-50/10">
+            <h3 class="text-base font-semibold text-red-700">Clear All Local Data</h3>
+            <p class="text-xs text-neutral-500">Permanently delete all leads and activity logs from local browser storage. (Export a backup first).</p>
+            <button onclick="app.handleClearAllData()"
+              class="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors">
+              Clear All CRM Data
             </button>
           </div>
 
-          <!-- App & Schema Info -->
+          <!-- System Info -->
           <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
             <h3 class="text-base font-semibold text-neutral-900 mb-3">System Information</h3>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
@@ -574,15 +566,15 @@
               </div>
               <div>
                 <span class="text-neutral-500 block">App Version</span>
-                <span class="font-medium text-neutral-900">1.0.0</span>
+                <span class="font-medium text-neutral-900">2.0.0 (Local Edition)</span>
               </div>
               <div>
-                <span class="text-neutral-500 block">Schema Version</span>
-                <span class="font-medium text-neutral-900">1.0</span>
+                <span class="text-neutral-500 block">Architecture</span>
+                <span class="font-medium text-neutral-900">Personal Single-User</span>
               </div>
               <div>
-                <span class="text-neutral-500 block">Persistence</span>
-                <span class="font-medium text-neutral-900">Google Sheets API v4</span>
+                <span class="text-neutral-500 block">Storage</span>
+                <span class="font-medium text-neutral-900">Browser IndexedDB</span>
               </div>
             </div>
           </div>
@@ -596,10 +588,13 @@
     <!--                     LEAD DETAIL SLIDE-OVER DRAWER                    -->
     <!-- ==================================================================== -->
     <div id="lead-drawer" class="fixed inset-0 overflow-hidden z-50 pointer-events-none hidden">
-      <div id="drawer-backdrop" onclick="app.closeLeadDrawer()" class="absolute inset-0 bg-neutral-900/30 backdrop-blur-sm opacity-0 transition-opacity duration-200 pointer-events-auto"></div>
+      <div id="drawer-backdrop" onclick="app.closeLeadDrawer()"
+        class="absolute inset-0 bg-neutral-900/30 backdrop-blur-sm opacity-0 transition-opacity duration-200 pointer-events-auto">
+      </div>
 
       <div class="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div id="drawer-panel" class="w-screen max-w-xl bg-white border-l border-neutral-200 shadow-2xl flex flex-col pointer-events-auto transform translate-x-full transition-transform duration-200 ease-in-out">
+        <div id="drawer-panel"
+          class="w-screen max-w-xl bg-white border-l border-neutral-200 shadow-2xl flex flex-col pointer-events-auto transform translate-x-full transition-transform duration-200 ease-in-out">
 
           <!-- Drawer Header -->
           <div class="p-6 border-b border-neutral-200 bg-neutral-50/50 flex items-start justify-between">
@@ -612,30 +607,66 @@
               <h3 id="drawer-business-name" class="text-xl font-bold text-neutral-900">Business Name</h3>
               <p id="drawer-contact-name" class="text-sm font-medium text-neutral-600">Contact Person</p>
             </div>
-            <button onclick="app.closeLeadDrawer()" class="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors" title="Close (Esc)">
-              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button onclick="app.closeLeadDrawer()"
+              class="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+              title="Close (Esc)">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
 
           <!-- Drawer Body -->
           <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
+            <!-- Primary Instagram DM Action Bar -->
+            <div class="p-4 bg-purple-50/60 rounded-xl border border-purple-200 flex items-center justify-between gap-3">
+              <div>
+                <span class="text-[11px] font-bold text-purple-700 uppercase tracking-wide block">Instagram DM Outreach</span>
+                <span id="drawer-instagram-handle" class="text-sm font-semibold text-neutral-900 block truncate">Not set</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <a id="btn-drawer-open-ig" href="#" target="_blank" rel="noopener noreferrer"
+                  class="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                  <span>Open Instagram</span>
+                </a>
+              </div>
+            </div>
+
             <!-- Quick Action Buttons -->
             <div class="flex items-center gap-2 flex-wrap">
-              <button onclick="app.openEditLeadModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                <span>Edit Lead</span>
+              <button onclick="app.openAddActivityModal('Initial DM')"
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Log DM / Touchpoint</span>
               </button>
-              <button onclick="app.openAddActivityModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                <span>Add Activity</span>
-              </button>
-              <button onclick="app.openSetFollowupModal()" class="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
-                <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <button onclick="app.openSetFollowupModal()"
+                class="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
+                <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 <span>Set Follow-up</span>
               </button>
-              <button onclick="app.handleArchiveLead()" class="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors ml-auto">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <button onclick="app.openEditLeadModal()"
+                class="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
+                <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Edit Lead</span>
+              </button>
+              <button onclick="app.handleArchiveLead()"
+                class="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors ml-auto">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
                 <span>Archive</span>
               </button>
             </div>
@@ -654,7 +685,7 @@
 
             <!-- Business & Contact Details -->
             <div class="space-y-3">
-              <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Contact & Location</h4>
+              <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Contact & Links</h4>
               <div class="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span class="text-neutral-500 block">Location</span>
@@ -674,42 +705,26 @@
                 </div>
                 <div>
                   <span class="text-neutral-500 block">Website</span>
-                  <a id="drawer-website-link" href="#" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:underline block truncate">-</a>
+                  <a id="drawer-website-link" href="#" target="_blank" rel="noopener noreferrer"
+                    class="font-medium text-brand-600 hover:underline block truncate">-</a>
                 </div>
                 <div>
                   <span class="text-neutral-500 block">Instagram</span>
-                  <a id="drawer-instagram-link" href="#" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:underline block truncate">-</a>
+                  <a id="drawer-instagram-link" href="#" target="_blank" rel="noopener noreferrer"
+                    class="font-medium text-brand-600 hover:underline block truncate">-</a>
                 </div>
                 <div>
                   <span class="text-neutral-500 block">Lead Source</span>
                   <span id="drawer-lead-source" class="font-medium text-neutral-900">-</span>
-                </div>
-                <div>
-                  <span class="text-neutral-500 block">Google Place ID</span>
-                  <span id="drawer-place-id" class="font-mono text-neutral-700 truncate block">-</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Scores & Pipeline -->
-            <div class="space-y-3">
-              <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Opportunity Scores</h4>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-                  <span class="text-xs text-neutral-500">Lead Score</span>
-                  <p id="drawer-lead-score" class="text-lg font-bold text-neutral-900">0</p>
-                </div>
-                <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-                  <span class="text-xs text-neutral-500">Opportunity Score</span>
-                  <p id="drawer-opportunity-score" class="text-lg font-bold text-neutral-900">0</p>
                 </div>
               </div>
             </div>
 
             <!-- Notes -->
             <div class="space-y-2">
-              <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Notes</h4>
-              <div id="drawer-notes" class="p-3 bg-neutral-50 rounded-lg border border-neutral-200 text-xs text-neutral-800 whitespace-pre-wrap leading-relaxed min-h-[4rem]">
+              <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Notes & Angle</h4>
+              <div id="drawer-notes"
+                class="p-3 bg-neutral-50 rounded-lg border border-neutral-200 text-xs text-neutral-800 whitespace-pre-wrap leading-relaxed min-h-[4rem]">
                 No notes recorded.
               </div>
             </div>
@@ -717,27 +732,11 @@
             <!-- Activity Timeline -->
             <div class="space-y-3 pt-2">
               <div class="flex items-center justify-between">
-                <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Activity History</h4>
+                <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Outreach & Activity History</h4>
                 <button onclick="app.openAddActivityModal()" class="text-xs font-semibold text-brand-600 hover:text-brand-700">+ Log Touchpoint</button>
               </div>
               <div id="drawer-activities-list" class="space-y-3">
                 <!-- Dynamically populated -->
-              </div>
-            </div>
-
-            <!-- Technical Metadata (Read-only) -->
-            <div class="pt-4 border-t border-neutral-100 text-[11px] text-neutral-400 space-y-1">
-              <div class="flex justify-between">
-                <span>Date Added:</span>
-                <span id="drawer-date-added">-</span>
-              </div>
-              <div class="flex justify-between">
-                <span>Record Version:</span>
-                <span id="drawer-record-version">-</span>
-              </div>
-              <div class="flex justify-between">
-                <span>Last Updated:</span>
-                <span id="drawer-updated-at">-</span>
               </div>
             </div>
 
@@ -755,11 +754,13 @@
       <form method="dialog" onsubmit="app.submitAddLead(event)" class="flex flex-col max-h-[90vh]">
         <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
           <div>
-            <h3 class="text-lg font-bold text-neutral-900">Add New Prospect</h3>
-            <p class="text-xs text-neutral-500">Record a new lead into your CRM database.</p>
+            <h3 class="text-lg font-bold text-neutral-900">Add New Lead</h3>
+            <p class="text-xs text-neutral-500">Record a new lead into your CRM.</p>
           </div>
           <button type="button" onclick="document.getElementById('modal-add-lead').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -767,45 +768,50 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="add-business-name" class="block text-xs font-semibold text-neutral-700 mb-1">Business Name *</label>
-              <input type="text" id="add-business-name" required placeholder="e.g. Apex Performance" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="add-business-name" required placeholder="e.g. Apex Performance"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-contact-name" class="block text-xs font-semibold text-neutral-700 mb-1">Contact Name</label>
-              <input type="text" id="add-contact-name" placeholder="e.g. Marcus Vance" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="add-contact-name" placeholder="e.g. Marcus Vance"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-niche" class="block text-xs font-semibold text-neutral-700 mb-1">Niche *</label>
-              <input type="text" id="add-niche" required placeholder="e.g. Solar Energy, MedSpa, HVAC" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="add-niche" required placeholder="e.g. Solar Energy, MedSpa, HVAC"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-location" class="block text-xs font-semibold text-neutral-700 mb-1">Location *</label>
-              <input type="text" id="add-location" required placeholder="e.g. Austin, TX" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="add-location" required placeholder="e.g. Austin, TX"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            </div>
+            <div>
+              <label for="add-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram Handle *</label>
+              <input type="text" id="add-instagram" placeholder="@handle or Instagram link"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-website" class="block text-xs font-semibold text-neutral-700 mb-1">Website</label>
-              <input type="text" id="add-website" placeholder="https://example.com" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram</label>
-              <input type="text" id="add-instagram" placeholder="@handle or URL" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-email" class="block text-xs font-semibold text-neutral-700 mb-1">Email</label>
-              <input type="email" id="add-email" placeholder="owner@business.com" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="add-website" placeholder="https://example.com"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-phone" class="block text-xs font-semibold text-neutral-700 mb-1">Phone</label>
-              <input type="tel" id="add-phone" placeholder="+1 555-123-4567" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="tel" id="add-phone" placeholder="+1 555-123-4567"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="add-status" class="block text-xs font-semibold text-neutral-700 mb-1">Status *</label>
-              <select id="add-status" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Populated dynamically -->
+              <select id="add-status" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+                <!-- Dynamically populated -->
               </select>
             </div>
             <div>
               <label for="add-lead-tier" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Tier</label>
-              <select id="add-lead-tier" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="add-lead-tier"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <option value="A">Tier A</option>
                 <option value="B" selected>Tier B</option>
                 <option value="C">Tier C</option>
@@ -813,38 +819,31 @@
             </div>
             <div>
               <label for="add-lead-source" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Source</label>
-              <select id="add-lead-source" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Populated dynamically -->
+              <select id="add-lead-source"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+                <!-- Dynamically populated -->
               </select>
-            </div>
-            <div>
-              <label for="add-place-id" class="block text-xs font-semibold text-neutral-700 mb-1">Google Place ID (Optional)</label>
-              <input type="text" id="add-place-id" placeholder="ChIJ..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-lead-score" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Score (0-100)</label>
-              <input type="number" id="add-lead-score" min="0" max="100" value="50" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-opportunity-score" class="block text-xs font-semibold text-neutral-700 mb-1">Opportunity Score (0-100)</label>
-              <input type="number" id="add-opportunity-score" min="0" max="100" value="50" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
           </div>
 
           <div>
             <label for="add-next-followup" class="block text-xs font-semibold text-neutral-700 mb-1">Next Follow-up Date & Time</label>
-            <input type="datetime-local" id="add-next-followup" class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <input type="datetime-local" id="add-next-followup"
+              class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
           <div>
-            <label for="add-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes</label>
-            <textarea id="add-notes" rows="3" placeholder="Context, pain points, cold angle..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
+            <label for="add-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes & Cold Angle</label>
+            <textarea id="add-notes" rows="3" placeholder="Context, pain points, IG DM angle..."
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
           </div>
         </div>
 
         <div class="p-5 border-t border-neutral-200 flex items-center justify-end gap-3 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-add-lead').close()" class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" id="btn-submit-add-lead" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Create Lead</button>
+          <button type="button" onclick="document.getElementById('modal-add-lead').close()"
+            class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
+          <button type="submit" id="btn-submit-add-lead"
+            class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Create Lead</button>
         </div>
       </form>
     </dialog>
@@ -855,65 +854,65 @@
         <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
           <div>
             <h3 class="text-lg font-bold text-neutral-900">Edit Lead</h3>
-            <p class="text-xs text-neutral-500">Update prospect information.</p>
+            <p class="text-xs text-neutral-500">Update prospect details.</p>
           </div>
           <button type="button" onclick="document.getElementById('modal-edit-lead').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         <div class="p-6 overflow-y-auto space-y-4 text-sm">
           <input type="hidden" id="edit-lead-id">
-          <input type="hidden" id="edit-record-version">
-
-          <!-- Concurrency Error Banner -->
-          <div id="edit-concurrency-banner" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 leading-relaxed flex items-center justify-between">
-            <span>This lead changed since you opened it. Reload the latest version to prevent accidental overwrites.</span>
-            <button type="button" onclick="app.reloadActiveLead()" class="font-bold underline ml-2">Reload Latest</button>
-          </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="edit-business-name" class="block text-xs font-semibold text-neutral-700 mb-1">Business Name *</label>
-              <input type="text" id="edit-business-name" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="edit-business-name" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-contact-name" class="block text-xs font-semibold text-neutral-700 mb-1">Contact Name</label>
-              <input type="text" id="edit-contact-name" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="edit-contact-name"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-niche" class="block text-xs font-semibold text-neutral-700 mb-1">Niche *</label>
-              <input type="text" id="edit-niche" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="edit-niche" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-location" class="block text-xs font-semibold text-neutral-700 mb-1">Location *</label>
-              <input type="text" id="edit-location" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="edit-location" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            </div>
+            <div>
+              <label for="edit-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram Handle</label>
+              <input type="text" id="edit-instagram"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-website" class="block text-xs font-semibold text-neutral-700 mb-1">Website</label>
-              <input type="text" id="edit-website" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram</label>
-              <input type="text" id="edit-instagram" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-email" class="block text-xs font-semibold text-neutral-700 mb-1">Email</label>
-              <input type="email" id="edit-email" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="text" id="edit-website"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-phone" class="block text-xs font-semibold text-neutral-700 mb-1">Phone</label>
-              <input type="tel" id="edit-phone" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+              <input type="tel" id="edit-phone"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
             <div>
               <label for="edit-status" class="block text-xs font-semibold text-neutral-700 mb-1">Status *</label>
-              <select id="edit-status" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="edit-status" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <!-- Populated dynamically -->
               </select>
             </div>
             <div>
               <label for="edit-lead-tier" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Tier</label>
-              <select id="edit-lead-tier" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="edit-lead-tier"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <option value="A">Tier A</option>
                 <option value="B">Tier B</option>
                 <option value="C">Tier C</option>
@@ -921,58 +920,31 @@
             </div>
             <div>
               <label for="edit-lead-source" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Source</label>
-              <select id="edit-lead-source" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="edit-lead-source"
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <!-- Populated dynamically -->
               </select>
-            </div>
-            <div>
-              <label for="edit-place-id" class="block text-xs font-semibold text-neutral-700 mb-1">Google Place ID (Optional)</label>
-              <input type="text" id="edit-place-id" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-lead-score" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Score (0-100)</label>
-              <input type="number" id="edit-lead-score" min="0" max="100" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-opportunity-score" class="block text-xs font-semibold text-neutral-700 mb-1">Opportunity Score (0-100)</label>
-              <input type="number" id="edit-opportunity-score" min="0" max="100" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
             </div>
           </div>
 
           <div>
             <label for="edit-next-followup" class="block text-xs font-semibold text-neutral-700 mb-1">Next Follow-up Date & Time</label>
-            <input type="datetime-local" id="edit-next-followup" class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <input type="datetime-local" id="edit-next-followup"
+              class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
           <div>
-            <label for="edit-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes</label>
-            <textarea id="edit-notes" rows="3" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
-          </div>
-
-          <!-- Read-only Metadata Details -->
-          <div class="p-3 bg-neutral-50 rounded-lg border border-neutral-200 text-xs text-neutral-500 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div>
-              <span class="block text-[10px] uppercase font-semibold">Lead ID</span>
-              <span id="edit-readonly-id" class="font-mono text-neutral-700">-</span>
-            </div>
-            <div>
-              <span class="block text-[10px] uppercase font-semibold">Date Added</span>
-              <span id="edit-readonly-date" class="text-neutral-700">-</span>
-            </div>
-            <div>
-              <span class="block text-[10px] uppercase font-semibold">Last Contacted</span>
-              <span id="edit-readonly-contacted" class="text-neutral-700">-</span>
-            </div>
-            <div>
-              <span class="block text-[10px] uppercase font-semibold">Record Version</span>
-              <span id="edit-readonly-version" class="text-neutral-700 font-bold">-</span>
-            </div>
+            <label for="edit-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes & Angle</label>
+            <textarea id="edit-notes" rows="3"
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
           </div>
         </div>
 
         <div class="p-5 border-t border-neutral-200 flex items-center justify-end gap-3 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-edit-lead').close()" class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" id="btn-submit-edit-lead" class="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Save Changes</button>
+          <button type="button" onclick="document.getElementById('modal-edit-lead').close()"
+            class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
+          <button type="submit" id="btn-submit-edit-lead"
+            class="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Save Changes</button>
         </div>
       </form>
     </dialog>
@@ -982,11 +954,13 @@
       <form method="dialog" onsubmit="app.submitAddActivity(event)" class="flex flex-col">
         <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
           <div>
-            <h3 class="text-lg font-bold text-neutral-900">Log Activity Touchpoint</h3>
-            <p class="text-xs text-neutral-500">Record an outreach interaction or lead note.</p>
+            <h3 class="text-lg font-bold text-neutral-900">Log Outreach Touchpoint</h3>
+            <p class="text-xs text-neutral-500">Record an Instagram DM or lead activity.</p>
           </div>
           <button type="button" onclick="document.getElementById('modal-add-activity').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -994,13 +968,15 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label for="act-type" class="block text-xs font-semibold text-neutral-700 mb-1">Activity Type *</label>
-              <select id="act-type" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="act-type" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <!-- Populated dynamically -->
               </select>
             </div>
             <div>
               <label for="act-channel" class="block text-xs font-semibold text-neutral-700 mb-1">Channel *</label>
-              <select id="act-channel" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
+              <select id="act-channel" required
+                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
                 <!-- Populated dynamically -->
               </select>
             </div>
@@ -1008,28 +984,34 @@
 
           <div>
             <label for="act-datetime" class="block text-xs font-semibold text-neutral-700 mb-1">Date & Time *</label>
-            <input type="datetime-local" id="act-datetime" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <input type="datetime-local" id="act-datetime" required
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
           <div>
             <label for="act-summary" class="block text-xs font-semibold text-neutral-700 mb-1">Summary *</label>
-            <input type="text" id="act-summary" required placeholder="e.g. Sent personalized Loom audit regarding organic leads" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <input type="text" id="act-summary" required placeholder="e.g. Sent initial Instagram DM regarding solar leads"
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
           <div>
             <label for="act-outcome" class="block text-xs font-semibold text-neutral-700 mb-1">Outcome</label>
-            <input type="text" id="act-outcome" placeholder="e.g. Read, replied requesting pricing, no reply" class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
+            <input type="text" id="act-outcome" placeholder="e.g. Sent, read, replied requesting info, call booked"
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
           <div>
-            <label for="act-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Detailed Notes</label>
-            <textarea id="act-notes" rows="3" placeholder="Paste DM snippet or call takeaways..." class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
+            <label for="act-notes" class="block text-xs font-semibold text-neutral-700 mb-1">DM Message / Notes</label>
+            <textarea id="act-notes" rows="3" placeholder="Paste DM snippet or call takeaways..."
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
           </div>
         </div>
 
         <div class="p-5 border-t border-neutral-200 flex items-center justify-end gap-3 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-add-activity').close()" class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" id="btn-submit-add-activity" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Log Activity</button>
+          <button type="button" onclick="document.getElementById('modal-add-activity').close()"
+            class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
+          <button type="submit" id="btn-submit-add-activity"
+            class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Log Activity</button>
         </div>
       </form>
     </dialog>
@@ -1043,7 +1025,9 @@
             <p class="text-xs text-neutral-500">Pick a target date & time.</p>
           </div>
           <button type="button" onclick="document.getElementById('modal-set-followup').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
@@ -1051,19 +1035,25 @@
           <input type="hidden" id="set-followup-lead-id">
           <div>
             <label for="set-followup-datetime" class="block text-xs font-semibold text-neutral-700 mb-1.5">Next Follow-up *</label>
-            <input type="datetime-local" id="set-followup-datetime" required class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm">
+            <input type="datetime-local" id="set-followup-datetime" required
+              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm">
           </div>
           <!-- Quick presets -->
           <div class="flex gap-2 text-xs">
-            <button type="button" onclick="app.setFollowupPreset(1)" class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+1 Day</button>
-            <button type="button" onclick="app.setFollowupPreset(3)" class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+3 Days</button>
-            <button type="button" onclick="app.setFollowupPreset(7)" class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+1 Week</button>
+            <button type="button" onclick="app.setFollowupPreset(1)"
+              class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+1 Day</button>
+            <button type="button" onclick="app.setFollowupPreset(3)"
+              class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+3 Days</button>
+            <button type="button" onclick="app.setFollowupPreset(7)"
+              class="px-2.5 py-1 bg-neutral-100 hover:bg-neutral-200 rounded text-neutral-700">+1 Week</button>
           </div>
         </div>
 
         <div class="p-4 border-t border-neutral-200 flex items-center justify-end gap-2 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-set-followup').close()" class="px-3 py-1.5 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors">Save</button>
+          <button type="button" onclick="document.getElementById('modal-set-followup').close()"
+            class="px-3 py-1.5 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
+          <button type="submit"
+            class="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors">Save</button>
         </div>
       </form>
     </dialog>
@@ -1075,7 +1065,9 @@
 
   <!-- Application Scripts -->
   <script src="config.js"></script>
-  <script src="sheets.js"></script>
+  <script src="db.js"></script>
+  <script src="backup.js"></script>
   <script src="app.js"></script>
 </body>
+
 </html>

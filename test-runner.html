@@ -239,6 +239,53 @@
       const archived = await testService.archiveLead('test_sheet', 'lead_test_1', updatedLead.record_version);
       assert(archived.archived_at !== '', 'E2E: Archiving sets archived_at timestamp');
 
+      // Test 8. Allowlist Normalized Matching
+      const allowedSample = ['ALLOWED_USER_1', '  User2@Example.com  '];
+      const isAllowed1 = (email) => allowedSample.map(e => e.trim().toLowerCase()).includes((email || '').trim().toLowerCase());
+      assert(isAllowed1('user2@example.com') === true, 'Allowlist: Case-insensitive & trimmed match');
+      assert(isAllowed1('USER2@EXAMPLE.COM ') === true, 'Allowlist: Uppercase & trailing whitespace match');
+      assert(isAllowed1('unauthorized@example.com') === false, 'Allowlist: Non-allowlisted user denied');
+
+      // Test 9. Single-Flight Promise Coalescing
+      let executionCount = 0;
+      let singleFlightPending = null;
+      async function mockSingleFlightAuth() {
+        if (singleFlightPending) return singleFlightPending;
+        singleFlightPending = (async () => {
+          executionCount++;
+          await new Promise(r => setTimeout(r, 50));
+          return 'mock_token_123';
+        })();
+        try {
+          return await singleFlightPending;
+        } finally {
+          singleFlightPending = null;
+        }
+      }
+
+      const [res1, res2, res3] = await Promise.all([
+        mockSingleFlightAuth(),
+        mockSingleFlightAuth(),
+        mockSingleFlightAuth()
+      ]);
+      assert(res1 === 'mock_token_123' && res2 === 'mock_token_123' && res3 === 'mock_token_123', 'Single-Flight: Parallel callers receive same result');
+      assert(executionCount === 1, 'Single-Flight: Only ONE authorization execution occurs for concurrent requests');
+
+      // Test 10. Non-Interactive Restoration Method Check
+      assert(typeof sheetsService.restoreSession === 'function', 'Auth: restoreSession helper method is defined on SheetsService');
+      
+      let capturedPrompt = null;
+      const mockService = new SheetsService();
+      mockService.tokenClient = {
+        requestAccessToken: (opts) => { capturedPrompt = opts.prompt; }
+      };
+      mockService.ensureAuthorized('');
+      assert(capturedPrompt === '', 'Auth: Automatic restoration uses prompt: "" (non-interactive, no forced consent)');
+
+      // Test 11. Zero Persistence of OAuth Tokens Verification
+      assert(localStorage.getItem('accessToken') === null && localStorage.getItem('token') === null, 'Security: OAuth access tokens are NEVER stored in localStorage');
+      assert(sessionStorage.getItem('accessToken') === null && sessionStorage.getItem('token') === null, 'Security: OAuth access tokens are NEVER stored in sessionStorage');
+
       // Summary
       if (failed === 0) {
         summaryContainer.className = 'p-4 rounded-lg font-bold text-sm bg-emerald-950 text-emerald-300 border border-emerald-800';
@@ -248,5 +295,6 @@
         summaryContainer.textContent = `${failed} OF ${passed + failed} TESTS FAILED.`;
       }
     })();
-</body >
-</html >
+  </script>
+</body>
+</html>

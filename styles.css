@@ -89,22 +89,18 @@ dialog[open]::backdrop {
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1rem;
   white-space: nowrap;
 }
 
-.status-New { background-color: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-.status-Researching { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-.status-Ready-to-Contact { background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
-.status-Contacted { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
-.status-Follow-up { background-color: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
-.status-Replied { background-color: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
-.status-Call-Booked { background-color: #fce7f3; color: #be185d; border: 1px solid #fbcfe8; }
-.status-Call-Completed { background-color: #fae8ff; color: #86198f; border: 1px solid #f5d0fe; }
-.status-Proposal-Sent { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-.status-Won { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; font-weight: 600; }
-.status-Lost { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+/* Primary workflow status colors */
+.status-not-contacted, .status-new, .status-researching, .status-ready-to-contact { background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+.status-dm-sent, .status-contacted, .status-follow-up { background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+.status-replied { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-call-booked, .status-call-completed, .status-proposal-sent { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.status-won { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; font-weight: 700; }
+.status-lost { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
 /* Tier Badges */
 .tier-badge {
@@ -204,4 +200,9 @@ dialog[open]::backdrop {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 0.25rem;
+}
+
+/* App Loading Overlay transition */
+#app-loading-overlay {
+  transition: opacity 0.2s ease-in-out;
 }

@@ -1,6 +1,6 @@
 /**
  * ScaleWithLakshya Outreach CRM - Main Application Logic
- * Orchestrates UI state, Google Identity Services, Sheets API data flow, and workflows.
+ * Local-First single-user architecture powered by IndexedDB & BackupService.
  */
 
 class App {
@@ -10,8 +10,6 @@ class App {
     this.activities = [];
     this.activeLead = null;
     this.currentView = 'dashboard';
-    this.spreadsheetId = localStorage.getItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID) || null;
-    this.spreadsheetTitle = 'CRM Sheet';
     this.searchQuery = '';
     this.filters = {
       status: '',
@@ -20,7 +18,6 @@ class App {
       source: '',
       followup: ''
     };
-    this.isSyncing = false;
 
     // Bind methods
     this.init = this.init.bind(this);
@@ -40,19 +37,35 @@ class App {
     // Populate static dropdowns
     this.populateDropdowns();
 
-    // Reflect the current in-memory authentication state immediately.
-    this.updateAuthBadges(sheetsService.isAuthenticated());
+    // Show lightweight loading overlay
+    this.showLoadingOverlay('Opening local database...');
 
-    // Determine initial view
-    if (!this.spreadsheetId) {
-      this.switchView('setup');
-    } else {
-      // Check stored preference or default to dashboard
+    try {
+      await dbService.init();
       const savedView = localStorage.getItem(CONFIG.STORAGE_KEYS.ACTIVE_VIEW) || 'dashboard';
+      await this.refreshData();
       this.switchView(savedView);
-      // Attempt silent auth or prompt
-      this.refreshData();
+    } catch (e) {
+      console.error('Failed to initialize local database:', e);
+      this.showToast('Could not load local database: ' + e.message, 'error');
+    } finally {
+      this.hideLoadingOverlay();
     }
+  }
+
+  showLoadingOverlay(text = 'Opening your CRM...') {
+    const overlay = document.getElementById('app-loading-overlay');
+    const label = document.getElementById('app-loading-text');
+    if (label) {
+      const textSpan = label.querySelector('span') || label;
+      textSpan.textContent = text;
+    }
+    if (overlay) overlay.classList.remove('hidden');
+  }
+
+  hideLoadingOverlay() {
+    const overlay = document.getElementById('app-loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
   }
 
   handleKeyDown(e) {
@@ -70,7 +83,6 @@ class App {
     statusSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      // Preserve first option if it's "All Statuses"
       const isFilter = id.startsWith('filter');
       el.innerHTML = isFilter ? '<option value="">All Statuses</option>' : '';
       CONFIG.STATUSES.forEach(st => {
@@ -116,6 +128,7 @@ class App {
         const opt = document.createElement('option');
         opt.value = ch;
         opt.textContent = ch;
+        if (ch === 'Instagram') opt.selected = true;
         actChannelSelect.appendChild(opt);
       });
     }
@@ -126,18 +139,11 @@ class App {
   /* -------------------------------------------------------------------------- */
 
   switchView(viewName) {
-    // If not connected and trying to view CRM, redirect to setup
-    if (!this.spreadsheetId && viewName !== 'setup') {
-      viewName = 'setup';
-    }
-
     this.currentView = viewName;
-    if (viewName !== 'setup') {
-      localStorage.setItem(CONFIG.STORAGE_KEYS.ACTIVE_VIEW, viewName);
-    }
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ACTIVE_VIEW, viewName);
 
     // Hide all views
-    ['setup', 'dashboard', 'leads', 'followups', 'settings'].forEach(v => {
+    ['dashboard', 'leads', 'followups', 'settings'].forEach(v => {
       const el = document.getElementById(`view-${v}`);
       if (el) el.classList.add('hidden');
     });
@@ -163,176 +169,11 @@ class App {
       }
     });
 
-    // View specific actions
-    if (viewName === 'dashboard') {
-      this.renderDashboard();
-    } else if (viewName === 'leads') {
-      this.renderLeadsTable();
-    } else if (viewName === 'followups') {
-      this.renderFollowups();
-    } else if (viewName === 'settings') {
-      this.renderSettings();
-    } else if (viewName === 'setup') {
-      this.updateSetupUI();
-    }
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                         AUTHENTICATION & CONNECTION                        */
-  /* -------------------------------------------------------------------------- */
-
-  async handleGoogleSignIn(forcePrompt = false) {
-    const clientId = getGoogleClientId();
-
-    if (!clientId) {
-      this.showToast('Google authorization is not configured for this CRM.', 'error');
-      return;
-    }
-
-    try {
-      this.showToast(forcePrompt ? 'Reconnecting Google...' : 'Connecting to Google...', 'info');
-      sheetsService.initAuth(clientId);
-      await sheetsService.ensureAccessToken({
-        interactive: true,
-        forceConsent: forcePrompt
-      });
-
-      this.updateAuthBadges(true);
-      this.updateSetupUI();
-
-      if (this.spreadsheetId) {
-        await this.refreshData();
-      } else {
-        this.showToast('Google connected. You can now connect your CRM Sheet.', 'success');
-      }
-    } catch (err) {
-      console.warn('Google authorization failed:', err.code || 'AUTH_FAILED');
-
-      const message = err.code === 'SCOPE_NOT_GRANTED'
-        ? 'Google Sheets permission was not granted. Please reconnect and allow access.'
-        : (err.message || 'Google authorization failed.');
-
-      this.showToast(message, 'error');
-      this.updateAuthBadges(false);
-    }
-  }
-
-  updateAuthBadges(isAuthed) {
-    const setupAuthBadge = document.getElementById('setup-auth-badge');
-    const settingsAuthBadge = document.getElementById('settings-auth-badge');
-    const sidebarAuth = document.getElementById('sidebar-auth-status');
-
-    if (isAuthed) {
-      if (setupAuthBadge) {
-        setupAuthBadge.textContent = 'Authorized';
-        setupAuthBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium';
-      }
-      if (settingsAuthBadge) {
-        settingsAuthBadge.textContent = 'Authorized';
-        settingsAuthBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-medium';
-      }
-      if (sidebarAuth) sidebarAuth.textContent = 'Connected & Authorized';
-    } else {
-      if (setupAuthBadge) {
-        setupAuthBadge.textContent = 'Not signed in';
-        setupAuthBadge.className = 'text-xs px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 font-medium';
-      }
-      if (settingsAuthBadge) {
-        settingsAuthBadge.textContent = 'Not authorized';
-        settingsAuthBadge.className = 'text-xs px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-700 font-medium';
-      }
-      if (sidebarAuth) sidebarAuth.textContent = 'Sign-in required';
-    }
-  }
-
-  updateSetupUI() {
-    const isAuthed = sheetsService.isAuthenticated();
-    const btnConnect = document.getElementById('btn-setup-connect');
-    const sheetInput = document.getElementById('setup-sheet-url');
-
-    if (btnConnect) {
-      btnConnect.disabled = !isAuthed;
-    }
-
-    if (this.spreadsheetId && sheetInput && !sheetInput.value) {
-      sheetInput.value = `https://docs.google.com/spreadsheets/d/${this.spreadsheetId}/edit`;
-    }
-  }
-
-  async handleConnectSheet() {
-    const sheetUrlInput = document.getElementById('setup-sheet-url');
-    const statusMsg = document.getElementById('setup-status-message');
-    const btnConnect = document.getElementById('btn-setup-connect');
-    const btnText = document.getElementById('setup-connect-text');
-
-    const rawUrl = (sheetUrlInput?.value || '').trim();
-    if (!rawUrl) {
-      this.showToast('Please enter a Google Sheet URL', 'error');
-      return;
-    }
-
-    const extractedId = sheetsService.extractSpreadsheetId(rawUrl);
-    if (!extractedId) {
-      this.showToast('Invalid Google Sheet URL or ID format.', 'error');
-      return;
-    }
-
-    if (!sheetsService.isAuthenticated()) {
-      this.showToast('Please sign in with Google first.', 'error');
-      await this.handleGoogleSignIn();
-      if (!sheetsService.isAuthenticated()) return;
-    }
-
-    try {
-      btnConnect.disabled = true;
-      btnText.textContent = 'Validating & Initializing...';
-      if (statusMsg) {
-        statusMsg.className = 'mt-4 p-3 rounded-lg text-xs leading-relaxed bg-brand-50 text-brand-800 border border-brand-200 block';
-        statusMsg.textContent = 'Connecting to Google Sheets API and verifying database schema...';
-      }
-
-      // Initialize database (idempotent: checks/creates LEADS, ACTIVITY, SETTINGS)
-      const res = await sheetsService.initializeOrValidateDatabase(extractedId);
-
-      this.spreadsheetId = extractedId;
-      this.spreadsheetTitle = res.title || 'CRM Sheet';
-      localStorage.setItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID, extractedId);
-
-      if (statusMsg) {
-        statusMsg.className = 'mt-4 p-3 rounded-lg text-xs leading-relaxed bg-emerald-50 text-emerald-800 border border-emerald-200 block';
-        statusMsg.textContent = 'Connected successfully! Initializing CRM workspace...';
-      }
-
-      this.showToast('Google Sheet connected successfully!', 'success');
-      
-      // Load data and enter CRM
-      await this.refreshData();
-      this.switchView('dashboard');
-
-    } catch (err) {
-      console.error('Connection error:', err);
-      if (statusMsg) {
-        statusMsg.className = 'mt-4 p-3 rounded-lg text-xs leading-relaxed bg-red-50 text-red-800 border border-red-200 block';
-        statusMsg.textContent = err.message || 'Could not connect to this Google Sheet.';
-      }
-      this.showToast(err.message || 'Could not connect to Sheet.', 'error');
-    } finally {
-      btnConnect.disabled = false;
-      btnText.textContent = 'Connect Sheet';
-    }
-  }
-
-  disconnectSpreadsheet() {
-    if (confirm('Disconnect this spreadsheet from the CRM? Your data will remain intact in Google Sheets.')) {
-      this.spreadsheetId = null;
-      this.leads = [];
-      this.allLeadsRaw = [];
-      this.activities = [];
-      this.activeLead = null;
-      localStorage.removeItem(CONFIG.STORAGE_KEYS.SPREADSHEET_ID);
-      this.switchView('setup');
-      this.showToast('Spreadsheet disconnected.', 'info');
-    }
+    // Render View Content
+    if (viewName === 'dashboard') this.renderDashboard();
+    else if (viewName === 'leads') this.renderLeadsTable();
+    else if (viewName === 'followups') this.renderFollowups();
+    else if (viewName === 'settings') this.renderSettings();
   }
 
   /* -------------------------------------------------------------------------- */
@@ -340,66 +181,30 @@ class App {
   /* -------------------------------------------------------------------------- */
 
   async refreshData() {
-    if (!this.spreadsheetId) return;
-
-    if (!sheetsService.isAuthenticated()) {
-      try {
-        // Returning users get a silent authorization attempt. No account
-        // chooser or consent screen is opened from this background path.
-        await sheetsService.ensureAccessToken({ interactive: false });
-        this.updateAuthBadges(true);
-      } catch (e) {
-        this.updateAuthBadges(false);
-        if (e?.code === 'AUTH_REQUIRED') {
-          this.showToast('Google authorization is required. Use Reconnect Google in Settings.', 'info');
-        } else {
-          this.showToast('Google authorization could not be restored.', 'info');
-        }
-        return;
-      }
-    }
-
-    if (this.isSyncing) return;
-    this.isSyncing = true;
-
     try {
-      this.showToast('Syncing with Google Sheets...', 'info');
-
-      // 1. Fetch metadata to get title
-      try {
-        const meta = await sheetsService.getSpreadsheetMetadata(this.spreadsheetId);
-        this.spreadsheetTitle = meta.properties?.title || 'CRM Sheet';
-        const sidebarTitle = document.getElementById('sidebar-sheet-title');
-        if (sidebarTitle) sidebarTitle.textContent = this.spreadsheetTitle;
-      } catch (e) {
-        console.warn('Metadata fetch failed:', e);
-      }
-
-      // 2. Fetch Leads and Activities in parallel
       const [allLeads, allActivities] = await Promise.all([
-        sheetsService.getAllLeads(this.spreadsheetId),
-        sheetsService.getAllActivities(this.spreadsheetId)
+        dbService.getAllLeads(),
+        dbService.getAllActivities()
       ]);
 
       this.allLeadsRaw = allLeads;
-      // Filter out archived leads for regular views
       this.leads = allLeads.filter(l => !l.archived_at && l.lead_id);
       this.activities = allActivities;
 
-      // Update sidebar counts
+      // Update sidebar count
       const countEl = document.getElementById('nav-leads-count');
       if (countEl) countEl.textContent = this.leads.length;
 
-      // Dynamically populate Niche filter from actual leads
+      // Dynamically populate Niche filter
       this.updateNicheFilterOptions();
 
-      // Render current view
+      // Render view
       if (this.currentView === 'dashboard') this.renderDashboard();
       else if (this.currentView === 'leads') this.renderLeadsTable();
       else if (this.currentView === 'followups') this.renderFollowups();
       else if (this.currentView === 'settings') this.renderSettings();
 
-      // If drawer is open with an active lead, update its state
+      // Update active lead drawer if open
       if (this.activeLead) {
         const fresh = this.leads.find(l => l.lead_id === this.activeLead.lead_id);
         if (fresh) {
@@ -407,13 +212,9 @@ class App {
           this.renderLeadDrawerContent();
         }
       }
-
-      this.showToast('CRM data up to date', 'success');
     } catch (err) {
-      console.error('Error refreshing CRM data:', err);
-      this.showToast(`Sync failed: ${err.message}`, 'error');
-    } finally {
-      this.isSyncing = false;
+      console.error('Error loading CRM data from IndexedDB:', err);
+      this.showToast(`Error loading local data: ${err.message}`, 'error');
     }
   }
 
@@ -442,61 +243,52 @@ class App {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
 
-    // Metrics calculations
     let countTotal = this.leads.length;
-    let countNew = 0;
-    let countReady = 0;
-    let countContacted = 0;
-    let countReplies = 0;
+    let countNotContacted = 0;
+    let countDmSent = 0;
+    let countReplied = 0;
     let countCallsBooked = 0;
-    let countProposals = 0;
     let countWon = 0;
-    let countLost = 0;
 
     let overdueFollowups = [];
     let dueTodayFollowups = [];
 
     this.leads.forEach(lead => {
-      // Status breakdown
-      switch (lead.status) {
-        case 'New': countNew++; break;
-        case 'Ready to Contact': countReady++; break;
-        case 'Contacted': countContacted++; break;
-        case 'Replied': countReplies++; break;
-        case 'Call Booked': countCallsBooked++; break;
-        case 'Proposal Sent': countProposals++; break;
-        case 'Won': countWon++; break;
-        case 'Lost': countLost++; break;
+      const st = (lead.status || '').toUpperCase();
+
+      if (st === 'NOT CONTACTED' || st === 'NEW' || st === 'RESEARCHING' || st === 'READY TO CONTACT') {
+        countNotContacted++;
+      } else if (st === 'DM SENT' || st === 'CONTACTED' || st === 'FOLLOW-UP') {
+        countDmSent++;
+      } else if (st === 'REPLIED') {
+        countReplied++;
+      } else if (st === 'CALL BOOKED' || st === 'CALL COMPLETED' || st === 'PROPOSAL SENT') {
+        countCallsBooked++;
+      } else if (st === 'WON') {
+        countWon++;
       }
 
-      // Follow-up calculations
+      // Follow-up check
       if (lead.next_follow_up_at) {
         const fTime = new Date(lead.next_follow_up_at).getTime();
         if (!isNaN(fTime)) {
-          if (fTime < todayStart) {
-            overdueFollowups.push(lead);
-          } else if (fTime >= todayStart && fTime <= todayEnd) {
-            dueTodayFollowups.push(lead);
-          }
+          if (fTime < todayStart) overdueFollowups.push(lead);
+          else if (fTime >= todayStart && fTime <= todayEnd) dueTodayFollowups.push(lead);
         }
       }
     });
 
-    // Update DOM metrics
+    // Update DOM Metrics
     this.setElemText('metric-total-leads', countTotal);
-    this.setElemText('metric-new', countNew);
-    this.setElemText('metric-ready', countReady);
-    this.setElemText('metric-contacted', countContacted);
+    this.setElemText('metric-not-contacted', countNotContacted);
+    this.setElemText('metric-dm-sent', countDmSent);
+    this.setElemText('metric-replied', countReplied);
     this.setElemText('metric-overdue', overdueFollowups.length);
     this.setElemText('metric-due-today', dueTodayFollowups.length);
-
-    this.setElemText('metric-replies', countReplies);
     this.setElemText('metric-calls-booked', countCallsBooked);
-    this.setElemText('metric-proposals', countProposals);
     this.setElemText('metric-won', countWon);
-    this.setElemText('metric-lost', countLost);
 
-    // Update Overdue badge in sidebar
+    // Sidebar overdue badge
     const navOverdue = document.getElementById('nav-overdue-count');
     if (navOverdue) {
       if (overdueFollowups.length > 0) {
@@ -507,7 +299,7 @@ class App {
       }
     }
 
-    // Render Action Center (Overdue & Due Today)
+    // Urgent follow-ups list
     const urgentContainer = document.getElementById('dashboard-urgent-followups');
     if (urgentContainer) {
       const urgentList = [...overdueFollowups, ...dueTodayFollowups];
@@ -533,7 +325,7 @@ class App {
                   <span class="badge-status status-${this.slugify(lead.status)} text-[10px]">${this.escapeHtml(lead.status)}</span>
                 </div>
                 <div class="text-xs text-neutral-500 mt-0.5 flex items-center gap-2">
-                  <span>${this.escapeHtml(lead.contact_name || lead.location || 'Prospect')}</span>
+                  <span>${this.escapeHtml(lead.instagram || lead.contact_name || 'Prospect')}</span>
                   <span>&bull;</span>
                   <span>Last touch: ${lead.last_contacted_at ? this.formatDate(lead.last_contacted_at) : 'Never'}</span>
                 </div>
@@ -549,21 +341,17 @@ class App {
       }
     }
 
-    // Render Recent Activity list
+    // Recent activity list
     const activityContainer = document.getElementById('dashboard-recent-activity');
     if (activityContainer) {
       if (this.activities.length === 0) {
         activityContainer.innerHTML = `
           <div class="py-8 text-center text-xs text-neutral-400">
-            No activity recorded yet. Add touches from any lead profile.
+            No outreach activities recorded yet. Open any lead to log DMs.
           </div>
         `;
       } else {
-        // Sort newest first
-        const sortedActivities = [...this.activities].sort((a, b) => {
-          return new Date(b.activity_at || 0) - new Date(a.activity_at || 0);
-        }).slice(0, 8);
-
+        const sortedActivities = [...this.activities].sort((a, b) => new Date(b.activity_at || 0) - new Date(a.activity_at || 0)).slice(0, 8);
         activityContainer.innerHTML = sortedActivities.map(act => {
           const relatedLead = this.leads.find(l => l.lead_id === act.lead_id);
           const bizName = relatedLead ? relatedLead.business_name : 'Lead';
@@ -620,44 +408,26 @@ class App {
     const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
 
     return this.leads.filter(lead => {
-      // 1. Search Query across 7 fields
       if (this.searchQuery) {
         const haystack = [
           lead.business_name,
           lead.contact_name,
           lead.niche,
           lead.location,
+          lead.instagram,
           lead.website,
           lead.email,
           lead.phone
         ].filter(Boolean).join(' ').toLowerCase();
 
-        if (!haystack.includes(this.searchQuery)) {
-          return false;
-        }
+        if (!haystack.includes(this.searchQuery)) return false;
       }
 
-      // 2. Status Filter
-      if (this.filters.status && lead.status !== this.filters.status) {
-        return false;
-      }
+      if (this.filters.status && lead.status !== this.filters.status) return false;
+      if (this.filters.niche && lead.niche !== this.filters.niche) return false;
+      if (this.filters.tier && lead.lead_tier !== this.filters.tier) return false;
+      if (this.filters.source && lead.lead_source !== this.filters.source) return false;
 
-      // 3. Niche Filter
-      if (this.filters.niche && lead.niche !== this.filters.niche) {
-        return false;
-      }
-
-      // 4. Tier Filter
-      if (this.filters.tier && lead.lead_tier !== this.filters.tier) {
-        return false;
-      }
-
-      // 5. Source Filter
-      if (this.filters.source && lead.lead_source !== this.filters.source) {
-        return false;
-      }
-
-      // 6. Follow-up state Filter
       if (this.filters.followup) {
         const fTime = lead.next_follow_up_at ? new Date(lead.next_follow_up_at).getTime() : null;
         if (this.filters.followup === 'none' && fTime) return false;
@@ -691,11 +461,16 @@ class App {
               <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-3">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               </div>
-              <h4 class="text-base font-bold text-neutral-900">Your outreach list is empty</h4>
-              <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">Add your first target prospect to start tracking outreach and building your pipeline.</p>
-              <button onclick="app.openAddLeadModal()" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">
-                Add your first lead
-              </button>
+              <h4 class="text-base font-bold text-neutral-900">Your lead list is currently empty</h4>
+              <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">Add your first target prospect or import your existing CSV/JSON database in Settings.</p>
+              <div class="flex items-center justify-center gap-3 mt-4">
+                <button onclick="app.openAddLeadModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">
+                  Add Lead
+                </button>
+                <button onclick="app.switchView('settings')" class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
+                  Import CSV / JSON
+                </button>
+              </div>
             </td>
           </tr>
         `;
@@ -720,7 +495,6 @@ class App {
     const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
 
     tableBody.innerHTML = filtered.map(lead => {
-      // Follow-up badge formatting
       let followUpBadge = '<span class="text-neutral-400 text-xs">-</span>';
       if (lead.next_follow_up_at) {
         const fTime = new Date(lead.next_follow_up_at).getTime();
@@ -734,9 +508,20 @@ class App {
         }
       }
 
-      const lastContactedBadge = lead.last_contacted_at 
+      const lastContactedBadge = lead.last_contacted_at
         ? `<span class="text-xs text-neutral-700">${this.formatDate(lead.last_contacted_at)}</span>`
         : `<span class="text-xs text-neutral-400">Never</span>`;
+
+      const igUrl = lead.instagram
+        ? (lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`)
+        : null;
+
+      const igBadge = igUrl
+        ? `<a href="${this.sanitizeExternalUrl(igUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 font-medium text-xs truncate max-w-[140px]">
+            <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            <span class="truncate">${this.escapeHtml(lead.instagram)}</span>
+          </a>`
+        : '<span class="text-neutral-400 text-xs">-</span>';
 
       return `
         <tr onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(lead.lead_id))}')" class="table-row-hover">
@@ -751,13 +536,13 @@ class App {
             <span class="inline-block px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-medium">${this.escapeHtml(lead.niche || '-')}</span>
           </td>
           <td class="px-4 py-3.5 whitespace-nowrap">
+            ${igBadge}
+          </td>
+          <td class="px-4 py-3.5 whitespace-nowrap">
             <span class="badge-status status-${this.slugify(lead.status)}">${this.escapeHtml(lead.status)}</span>
           </td>
           <td class="px-3 py-3.5 whitespace-nowrap text-center">
             <span class="tier-badge tier-${lead.lead_tier || 'B'}">${this.escapeHtml(lead.lead_tier || 'B')}</span>
-          </td>
-          <td class="px-3 py-3.5 whitespace-nowrap text-center text-xs font-semibold text-neutral-800">
-            ${lead.lead_score || '0'}
           </td>
           <td class="px-4 py-3.5 whitespace-nowrap">
             ${followUpBadge}
@@ -819,15 +604,25 @@ class App {
     this.setElemText('drawer-location', lead.location || '-');
     this.setElemText('drawer-niche', lead.niche || '-');
     this.setElemText('drawer-lead-source', lead.lead_source || 'Manual');
-    this.setElemText('drawer-place-id', lead.google_place_id || 'None');
-    this.setElemText('drawer-lead-score', lead.lead_score || '0');
-    this.setElemText('drawer-opportunity-score', lead.opportunity_score || '0');
     this.setElemText('drawer-notes', lead.notes || 'No notes recorded.');
-    this.setElemText('drawer-date-added', this.formatDateTime(lead.date_added));
-    this.setElemText('drawer-record-version', `v${lead.record_version || 1}`);
-    this.setElemText('drawer-updated-at', this.formatDateTime(lead.updated_at));
+    this.setElemText('drawer-instagram-handle', lead.instagram || 'Not set');
 
-    // Badges
+    // Instagram Button setup
+    const igBtn = document.getElementById('btn-drawer-open-ig');
+    if (igBtn) {
+      if (lead.instagram) {
+        const url = lead.instagram.startsWith('http')
+          ? lead.instagram
+          : `https://instagram.com/${lead.instagram.replace('@', '')}`;
+        igBtn.href = this.sanitizeExternalUrl(url);
+        igBtn.classList.remove('pointer-events-none', 'opacity-50');
+      } else {
+        igBtn.removeAttribute('href');
+        igBtn.classList.add('pointer-events-none', 'opacity-50');
+      }
+    }
+
+    // Status Badges
     const statusBadge = document.getElementById('drawer-status-badge');
     if (statusBadge) {
       statusBadge.className = `badge-status status-${this.slugify(lead.status)}`;
@@ -843,11 +638,7 @@ class App {
     // Follow-up status
     const followupEl = document.getElementById('drawer-next-followup');
     if (followupEl) {
-      if (lead.next_follow_up_at) {
-        followupEl.textContent = this.formatDateTime(lead.next_follow_up_at);
-      } else {
-        followupEl.textContent = 'None scheduled';
-      }
+      followupEl.textContent = lead.next_follow_up_at ? this.formatDateTime(lead.next_follow_up_at) : 'None scheduled';
     }
 
     const contactedEl = document.getElementById('drawer-last-contacted');
@@ -855,35 +646,17 @@ class App {
       contactedEl.textContent = lead.last_contacted_at ? this.formatDateTime(lead.last_contacted_at) : 'Never contacted';
     }
 
-    // Links: only allow safe, expected protocols.
-    this.setupDrawerLink(
-      'drawer-email-link',
-      lead.email ? `mailto:${lead.email.trim()}` : null,
-      lead.email
-    );
-    this.setupDrawerLink(
-      'drawer-phone-link',
-      lead.phone ? `tel:${lead.phone.trim()}` : null,
-      lead.phone
-    );
-    this.setupDrawerLink(
-      'drawer-website-link',
-      this.sanitizeExternalUrl(lead.website),
-      lead.website
-    );
+    // Contact Links
+    this.setupDrawerLink('drawer-email-link', lead.email ? `mailto:${lead.email.trim()}` : null, lead.email);
+    this.setupDrawerLink('drawer-phone-link', lead.phone ? `tel:${lead.phone.trim()}` : null, lead.phone);
+    this.setupDrawerLink('drawer-website-link', this.sanitizeExternalUrl(lead.website), lead.website);
     this.setupDrawerLink(
       'drawer-instagram-link',
-      lead.instagram
-        ? this.sanitizeExternalUrl(
-            lead.instagram.startsWith('http')
-              ? lead.instagram
-              : `https://instagram.com/${lead.instagram.replace('@', '')}`
-          )
-        : null,
+      lead.instagram ? this.sanitizeExternalUrl(lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`) : null,
       lead.instagram
     );
 
-    // Activity Timeline (Filtered to this lead, sorted newest first)
+    // Activity Timeline
     const leadActivities = this.activities
       .filter(a => a.lead_id === lead.lead_id)
       .sort((a, b) => new Date(b.activity_at || 0) - new Date(a.activity_at || 0));
@@ -893,7 +666,7 @@ class App {
       if (leadActivities.length === 0) {
         actListContainer.innerHTML = `
           <div class="p-4 bg-neutral-50 rounded-lg text-center text-xs text-neutral-400">
-            No outreach recorded for this lead yet.
+            No outreach touchpoints logged for this lead yet.
           </div>
         `;
       } else {
@@ -958,21 +731,15 @@ class App {
         return;
       }
 
-      if (fTime < todayStart) {
-        overdue.push(lead);
-      } else if (fTime >= todayStart && fTime <= todayEnd) {
-        today.push(lead);
-      } else {
-        upcoming.push(lead);
-      }
+      if (fTime < todayStart) overdue.push(lead);
+      else if (fTime >= todayStart && fTime <= todayEnd) today.push(lead);
+      else upcoming.push(lead);
     });
 
-    // Sort overdue & today earliest first; upcoming earliest first
     overdue.sort((a, b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at));
     today.sort((a, b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at));
     upcoming.sort((a, b) => new Date(a.next_follow_up_at) - new Date(b.next_follow_up_at));
 
-    // Update Section Badges
     this.setElemText('badge-overdue-count', overdue.length);
     this.setElemText('badge-today-count', today.length);
     this.setElemText('badge-upcoming-count', upcoming.length);
@@ -1002,7 +769,7 @@ class App {
             <span class="tier-badge tier-${lead.lead_tier || 'B'} text-[10px] w-4 h-4">${this.escapeHtml(lead.lead_tier || 'B')}</span>
           </div>
           <div class="text-xs text-neutral-500 mt-1 flex items-center gap-3">
-            <span>${this.escapeHtml(lead.contact_name || lead.location || 'No contact')}</span>
+            <span>${this.escapeHtml(lead.instagram || lead.contact_name || 'No contact')}</span>
             <span>&bull;</span>
             <span>Last touch: ${lead.last_contacted_at ? this.formatDateTime(lead.last_contacted_at) : 'Never'}</span>
           </div>
@@ -1039,15 +806,70 @@ class App {
   /* -------------------------------------------------------------------------- */
 
   renderSettings() {
-    this.setElemText('settings-sheet-name', this.spreadsheetTitle || 'CRM Sheet');
-    this.setElemText('settings-sheet-id', this.spreadsheetId || 'Not connected');
+    this.setElemText('settings-total-leads', this.allLeadsRaw.length);
+    this.setElemText('settings-active-leads', this.leads.length);
+    this.setElemText('settings-total-activities', this.activities.length);
+  }
 
-    const linkEl = document.getElementById('settings-sheet-link');
-    if (linkEl && this.spreadsheetId) {
-      linkEl.href = `https://docs.google.com/spreadsheets/d/${this.spreadsheetId}/edit`;
+  async exportJsonBackup() {
+    try {
+      this.showToast('Generating JSON backup...', 'info');
+      await backupService.exportToJson();
+      this.showToast('JSON Backup downloaded successfully', 'success');
+    } catch (e) {
+      this.showToast('Export failed: ' + e.message, 'error');
     }
+  }
 
-    this.updateAuthBadges(sheetsService.isAuthenticated());
+  async exportCsvLeads() {
+    try {
+      this.showToast('Generating CSV file...', 'info');
+      await backupService.exportToCsv();
+      this.showToast('Leads CSV downloaded successfully', 'success');
+    } catch (e) {
+      this.showToast('Export CSV failed: ' + e.message, 'error');
+    }
+  }
+
+  async handleImportFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      this.showToast(`Importing ${file.name}...`, 'info');
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'json') {
+        const res = await backupService.importFromJsonFile(file);
+        this.showToast(`Imported ${res.leadsImported} leads and ${res.activitiesImported} touchpoints!`, 'success');
+      } else if (ext === 'csv') {
+        const res = await backupService.importFromCsvFile(file);
+        this.showToast(`Imported ${res.importedCount} leads (${res.skippedCount} skipped/duplicates)!`, 'success');
+      } else {
+        throw new Error('Unsupported file extension. Please select a .json or .csv file.');
+      }
+
+      await this.refreshData();
+      event.target.value = '';
+    } catch (e) {
+      console.error('Import failed:', e);
+      this.showToast('Import failed: ' + e.message, 'error');
+      event.target.value = '';
+    }
+  }
+
+  async handleClearAllData() {
+    if (confirm('WARNING: Permanently delete all leads and activity history from local storage? Export a JSON backup first if you want to keep your data.')) {
+      if (confirm('Are you absolutely sure? This action cannot be undone.')) {
+        try {
+          await dbService.clearAllData();
+          await this.refreshData();
+          this.showToast('All local CRM data has been cleared.', 'info');
+        } catch (e) {
+          this.showToast('Failed to clear data: ' + e.message, 'error');
+        }
+      }
+    }
   }
 
   /* -------------------------------------------------------------------------- */
@@ -1058,23 +880,18 @@ class App {
     const modal = document.getElementById('modal-add-lead');
     if (!modal) return;
 
-    // Reset form
     document.getElementById('add-business-name').value = '';
     document.getElementById('add-contact-name').value = '';
     document.getElementById('add-niche').value = '';
     document.getElementById('add-location').value = '';
     document.getElementById('add-website').value = '';
     document.getElementById('add-instagram').value = '';
-    document.getElementById('add-email').value = '';
     document.getElementById('add-phone').value = '';
-    document.getElementById('add-place-id').value = '';
     document.getElementById('add-notes').value = '';
     document.getElementById('add-next-followup').value = '';
-    document.getElementById('add-lead-score').value = '50';
-    document.getElementById('add-opportunity-score').value = '50';
-    document.getElementById('add-status').value = 'New';
+    document.getElementById('add-status').value = 'NOT CONTACTED';
     document.getElementById('add-lead-tier').value = 'B';
-    document.getElementById('add-lead-source').value = 'Manual';
+    document.getElementById('add-lead-source').value = 'Instagram';
 
     modal.showModal();
   }
@@ -1091,14 +908,10 @@ class App {
       location: document.getElementById('add-location').value,
       website: document.getElementById('add-website').value,
       instagram: document.getElementById('add-instagram').value,
-      email: document.getElementById('add-email').value,
       phone: document.getElementById('add-phone').value,
       status: document.getElementById('add-status').value,
       lead_tier: document.getElementById('add-lead-tier').value,
       lead_source: document.getElementById('add-lead-source').value,
-      google_place_id: document.getElementById('add-place-id').value,
-      lead_score: document.getElementById('add-lead-score').value,
-      opportunity_score: document.getElementById('add-opportunity-score').value,
       next_follow_up_at: document.getElementById('add-next-followup').value,
       notes: document.getElementById('add-notes').value
     };
@@ -1107,18 +920,12 @@ class App {
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Saving Lead...';
 
-      // Duplicate check & append via sheetsService
-      const newLead = await sheetsService.createLead(this.spreadsheetId, leadData, this.allLeadsRaw);
+      const newLead = await dbService.createLead(leadData, this.allLeadsRaw);
 
-      this.leads.unshift(newLead);
-      this.allLeadsRaw.unshift(newLead);
+      await this.refreshData();
       this.showToast(`Added lead: ${newLead.business_name}`, 'success');
 
       modal.close();
-      this.renderLeadsTable();
-      this.updateNicheFilterOptions();
-
-      // Open new lead in drawer
       this.openLeadDrawer(newLead.lead_id);
     } catch (err) {
       console.error('Error adding lead:', err);
@@ -1134,35 +941,21 @@ class App {
     if (!lead) return;
 
     const modal = document.getElementById('modal-edit-lead');
-    const banner = document.getElementById('edit-concurrency-banner');
     if (!modal) return;
 
-    if (banner) banner.classList.add('hidden');
-
     document.getElementById('edit-lead-id').value = lead.lead_id;
-    document.getElementById('edit-record-version').value = lead.record_version;
     document.getElementById('edit-business-name').value = lead.business_name || '';
     document.getElementById('edit-contact-name').value = lead.contact_name || '';
     document.getElementById('edit-niche').value = lead.niche || '';
     document.getElementById('edit-location').value = lead.location || '';
     document.getElementById('edit-website').value = lead.website || '';
     document.getElementById('edit-instagram').value = lead.instagram || '';
-    document.getElementById('edit-email').value = lead.email || '';
     document.getElementById('edit-phone').value = lead.phone || '';
-    document.getElementById('edit-status').value = lead.status || 'New';
+    document.getElementById('edit-status').value = lead.status || 'NOT CONTACTED';
     document.getElementById('edit-lead-tier').value = lead.lead_tier || 'B';
-    document.getElementById('edit-lead-source').value = lead.lead_source || 'Manual';
-    document.getElementById('edit-place-id').value = lead.google_place_id || '';
-    document.getElementById('edit-lead-score').value = lead.lead_score || '0';
-    document.getElementById('edit-opportunity-score').value = lead.opportunity_score || '0';
+    document.getElementById('edit-lead-source').value = lead.lead_source || 'Instagram';
     document.getElementById('edit-next-followup').value = lead.next_follow_up_at || '';
     document.getElementById('edit-notes').value = lead.notes || '';
-
-    // Read-only fields
-    this.setElemText('edit-readonly-id', lead.lead_id);
-    this.setElemText('edit-readonly-date', this.formatDateTime(lead.date_added));
-    this.setElemText('edit-readonly-contacted', lead.last_contacted_at ? this.formatDateTime(lead.last_contacted_at) : 'Never');
-    this.setElemText('edit-readonly-version', `v${lead.record_version}`);
 
     modal.showModal();
   }
@@ -1171,10 +964,7 @@ class App {
     e.preventDefault();
     const btnSubmit = document.getElementById('btn-submit-edit-lead');
     const modal = document.getElementById('modal-edit-lead');
-    const banner = document.getElementById('edit-concurrency-banner');
-
     const leadId = document.getElementById('edit-lead-id').value;
-    const expectedVersion = parseInt(document.getElementById('edit-record-version').value, 10);
 
     const updatedFields = {
       business_name: document.getElementById('edit-business-name').value,
@@ -1183,14 +973,10 @@ class App {
       location: document.getElementById('edit-location').value,
       website: document.getElementById('edit-website').value,
       instagram: document.getElementById('edit-instagram').value,
-      email: document.getElementById('edit-email').value,
       phone: document.getElementById('edit-phone').value,
       status: document.getElementById('edit-status').value,
       lead_tier: document.getElementById('edit-lead-tier').value,
       lead_source: document.getElementById('edit-lead-source').value,
-      google_place_id: document.getElementById('edit-place-id').value,
-      lead_score: document.getElementById('edit-lead-score').value,
-      opportunity_score: document.getElementById('edit-opportunity-score').value,
       next_follow_up_at: document.getElementById('edit-next-followup').value,
       notes: document.getElementById('edit-notes').value
     };
@@ -1199,64 +985,35 @@ class App {
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Saving Changes...';
 
-      // Updates with OPTIMISTIC CONCURRENCY PROTECTION
-      const updatedLead = await sheetsService.updateLead(this.spreadsheetId, leadId, updatedFields, expectedVersion);
-
-      // Update in memory arrays
-      const leadIdx = this.leads.findIndex(l => l.lead_id === leadId);
-      if (leadIdx !== -1) this.leads[leadIdx] = updatedLead;
-
-      const rawIdx = this.allLeadsRaw.findIndex(l => l.lead_id === leadId);
-      if (rawIdx !== -1) this.allLeadsRaw[rawIdx] = updatedLead;
+      const updatedLead = await dbService.updateLead(leadId, updatedFields, this.allLeadsRaw);
+      await this.refreshData();
 
       this.activeLead = updatedLead;
       this.renderLeadDrawerContent();
-      this.renderLeadsTable();
 
       this.showToast('Lead updated successfully!', 'success');
       modal.close();
     } catch (err) {
       console.error('Update error:', err);
-      if (err.isConcurrencyError) {
-        if (banner) banner.classList.remove('hidden');
-        this.showToast('Concurrency conflict: lead was updated elsewhere.', 'error');
-      } else {
-        this.showToast(err.message || 'Could not update lead.', 'error');
-      }
+      this.showToast(err.message || 'Could not update lead.', 'error');
     } finally {
       btnSubmit.disabled = false;
       btnSubmit.textContent = 'Save Changes';
     }
   }
 
-  async reloadActiveLead() {
-    if (!this.activeLead) return;
-    try {
-      this.showToast('Reloading fresh data from Google Sheet...', 'info');
-      await this.refreshData();
-      const fresh = this.leads.find(l => l.lead_id === this.activeLead.lead_id);
-      if (fresh) {
-        this.activeLead = fresh;
-        this.openEditLeadModal();
-        this.showToast('Loaded latest version.', 'success');
-      }
-    } catch (e) {
-      this.showToast('Failed to reload latest: ' + e.message, 'error');
-    }
-  }
-
-  openAddActivityModal() {
+  openAddActivityModal(defaultType = 'Initial DM') {
     const lead = this.activeLead;
     if (!lead) return;
 
     const modal = document.getElementById('modal-add-activity');
     if (!modal) return;
 
-    document.getElementById('act-summary').value = '';
-    document.getElementById('act-outcome').value = '';
+    document.getElementById('act-summary').value = defaultType === 'Initial DM' ? 'Sent initial Instagram DM' : '';
+    document.getElementById('act-outcome').value = defaultType === 'Initial DM' ? 'DM Sent' : '';
     document.getElementById('act-notes').value = '';
     document.getElementById('act-datetime').value = this.getNowLocalIso();
-    document.getElementById('act-type').value = 'Initial DM';
+    document.getElementById('act-type').value = defaultType;
     document.getElementById('act-channel').value = 'Instagram';
 
     modal.showModal();
@@ -1283,21 +1040,11 @@ class App {
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Logging Touchpoint...';
 
-      const { activity, updatedLead } = await sheetsService.addActivity(this.spreadsheetId, actData, lead);
+      await dbService.addActivity(actData, lead);
+      await this.refreshData();
 
-      this.activities.unshift(activity);
-
-      // If last_contacted_at was updated
-      if (updatedLead) {
-        const leadIdx = this.leads.findIndex(l => l.lead_id === lead.lead_id);
-        if (leadIdx !== -1) this.leads[leadIdx] = updatedLead;
-        this.activeLead = updatedLead;
-      }
-
-      this.showToast('Activity logged successfully!', 'success');
+      this.showToast('Outreach touchpoint logged successfully!', 'success');
       modal.close();
-      this.renderLeadDrawerContent();
-      this.renderLeadsTable();
     } catch (err) {
       console.error('Error logging activity:', err);
       this.showToast(err.message || 'Could not log activity.', 'error');
@@ -1336,24 +1083,11 @@ class App {
     const nextFollowup = document.getElementById('set-followup-datetime').value;
 
     try {
-      this.showToast('Updating follow-up...', 'info');
-      const updatedLead = await sheetsService.updateLead(
-        this.spreadsheetId,
-        lead.lead_id,
-        { next_follow_up_at: nextFollowup },
-        lead.record_version
-      );
-
-      const leadIdx = this.leads.findIndex(l => l.lead_id === lead.lead_id);
-      if (leadIdx !== -1) this.leads[leadIdx] = updatedLead;
-      this.activeLead = updatedLead;
+      await dbService.updateLead(lead.lead_id, { next_follow_up_at: nextFollowup }, this.allLeadsRaw);
+      await this.refreshData();
 
       this.showToast('Follow-up schedule updated', 'success');
       modal.close();
-      this.renderLeadDrawerContent();
-      if (this.currentView === 'followups') this.renderFollowups();
-      else if (this.currentView === 'dashboard') this.renderDashboard();
-      else this.renderLeadsTable();
     } catch (err) {
       console.error('Error setting follow-up:', err);
       this.showToast(err.message || 'Could not update follow-up.', 'error');
@@ -1366,15 +1100,10 @@ class App {
 
     if (confirm(`Archive "${lead.business_name}"? It will be removed from your active leads views.`)) {
       try {
-        this.showToast('Archiving lead...', 'info');
-        await sheetsService.archiveLead(this.spreadsheetId, lead.lead_id, lead.record_version);
-
-        // Remove from active leads array
-        this.leads = this.leads.filter(l => l.lead_id !== lead.lead_id);
+        await dbService.archiveLead(lead.lead_id);
+        await this.refreshData();
 
         this.closeLeadDrawer();
-        this.renderLeadsTable();
-        this.renderDashboard();
         this.showToast(`Archived "${lead.business_name}"`, 'success');
       } catch (err) {
         console.error('Archive failed:', err);
@@ -1454,26 +1183,20 @@ class App {
   getFutureLocalIso(daysAhead = 1) {
     const d = new Date();
     d.setDate(d.getDate() + daysAhead);
-    d.setHours(10, 0, 0, 0); // Default 10:00 AM
+    d.setHours(10, 0, 0, 0);
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
   }
 
   sanitizeExternalUrl(value) {
     if (!value || typeof value !== 'string') return null;
-
     const raw = value.trim();
     if (!raw) return null;
 
-    const candidate = /^https?:\/\//i.test(raw)
-      ? raw
-      : `https://${raw}`;
-
+    const candidate = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     try {
       const parsed = new URL(candidate);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        return null;
-      }
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
       return parsed.href;
     } catch (e) {
       return null;
@@ -1489,7 +1212,7 @@ class App {
   }
 
   slugify(text) {
-    return (text || '').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '');
+    return (text || '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
   }
 
   escapeHtml(str) {
@@ -1509,10 +1232,7 @@ class App {
 }
 
 // Instantiate global app
-const app = new App();
-window.app = app;
-
-// Run on page load
+window.app = new App();
 document.addEventListener('DOMContentLoaded', () => {
-  app.init();
+  window.app.init();
 });
