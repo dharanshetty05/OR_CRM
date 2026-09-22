@@ -36,12 +36,22 @@ class APIService {
    * Ping backend to check if it's available.
    */
   async init() {
-    try {
-      await this._fetch('/api/health');
-      return true;
-    } catch (e) {
-      throw new Error('Could not connect to the backend API. ' + e.message);
+    let retries = 0;
+    while (retries < 20) {
+      try {
+        const res = await this._fetch('/api/health');
+        if (res.ready) {
+          return true;
+        }
+      } catch (e) {
+        if (!e.message.includes('not running')) {
+          throw new Error('Could not connect to the backend API. ' + e.message);
+        }
+      }
+      await new Promise(r => setTimeout(r, 1000));
+      retries++;
     }
+    throw new Error('CRM backend is taking too long to start. Please try again.');
   }
 
   /* -------------------------------------------------------------------------- */
@@ -77,7 +87,10 @@ class APIService {
 
   async updateLead(leadId, updatedFields, existingLeads = []) {
     // We need the existing lead for duplicate checks
-    const existing = await this.getLeadById(leadId);
+    let existing = existingLeads.find(l => l.lead_id === leadId);
+    if (!existing) {
+      existing = await this.getLeadById(leadId);
+    }
     if (!existing) {
       throw new Error(`Lead with ID "${leadId}" was not found.`);
     }
