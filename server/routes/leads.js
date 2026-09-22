@@ -1,13 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { getRows, appendRow, updateRow, deleteRow, getSheetIdByTitle } = require('../googleSheets');
-// crypto is built into Node.js, we can use it to generate a simple unique ID 
-// to avoid adding another dependency like uuid
 const crypto = require('crypto');
 
 const SHEET_NAME = 'LEADS';
 
-// Helper to map row array to object
+let leadsCache = null;
+
+async function initLeads() {
+    console.log('Initializing Leads cache from Google Sheets...');
+    const rows = await getRows(`${SHEET_NAME}!A2:U`);
+    leadsCache = rows.map(mapRowToLead).filter(lead => lead.id);
+    console.log(`Loaded ${leadsCache.length} leads into cache.`);
+}
+
 function mapRowToLead(row) {
     return {
         id: row[0] || '',
@@ -34,7 +40,6 @@ function mapRowToLead(row) {
     };
 }
 
-// Map lead object back to row array
 function mapLeadToRow(lead) {
     return [
         lead.id || '',
@@ -61,38 +66,21 @@ function mapLeadToRow(lead) {
     ];
 }
 
-// GET all leads
-router.get('/', async (req, res) => {
-    try {
-        const rows = await getRows(`${SHEET_NAME}!A2:U`);
-        const leads = rows.map(mapRowToLead).filter(lead => lead.id);
-        res.json(leads);
-    } catch (error) {
-        console.error('Error fetching leads:', error.message || error);
-        res.status(500).json({ error: 'Failed to fetch leads' });
-    }
+router.get('/', (req, res) => {
+    if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+    res.json(leadsCache);
 });
 
-// GET one lead
-router.get('/:id', async (req, res) => {
-    try {
-        const rows = await getRows(`${SHEET_NAME}!A2:U`);
-        const leads = rows.map(mapRowToLead);
-        const lead = leads.find(l => l.id === req.params.id);
-        
-        if (!lead) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
-        res.json(lead);
-    } catch (error) {
-        console.error('Error fetching lead:', error.message || error);
-        res.status(500).json({ error: 'Failed to fetch lead' });
-    }
+router.get('/:id', (req, res) => {
+    if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+    const lead = leadsCache.find(l => l.id === req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    res.json(lead);
 });
 
-// POST create a lead
 router.post('/', async (req, res) => {
     try {
+        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
         const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
         if (req.body.business_name && typeof req.body.business_name !== 'string') {
             return res.status(400).json({ error: 'business_name must be a string' });
@@ -106,12 +94,13 @@ router.post('/', async (req, res) => {
 
         const newLead = {
             ...req.body,
-            id: req.body.id || crypto.randomUUID(), // use provided id if available
+            id: req.body.id || crypto.randomUUID(),
             created_at: new Date().toISOString()
         };
         const rowData = mapLeadToRow(newLead);
         
         await appendRow(`${SHEET_NAME}!A:U`, rowData);
+        leadsCache.push(newLead);
         res.status(201).json(newLead);
     } catch (error) {
         console.error('Error creating lead:', error.message || error);
@@ -119,9 +108,9 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PATCH update a lead
 router.patch('/:id', async (req, res) => {
     try {
+        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
         const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
         if (req.body.business_name && typeof req.body.business_name !== 'string') {
             return res.status(400).json({ error: 'business_name must be a string' });
@@ -133,22 +122,21 @@ router.patch('/:id', async (req, res) => {
             return res.status(400).json({ error: 'website must be a string' });
         }
 
-        const rows = await getRows(`${SHEET_NAME}!A2:U`);
-        const leads = rows.map(mapRowToLead);
-        const rowIndex = leads.findIndex(l => l.id === req.params.id);
-        
-        if (rowIndex === -1) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
+        const rowIndex = leadsCache.findIndex(l => l.id === req.params.id);
+        if (rowIndex === -1) return res.status(404).json({ error: 'Lead not found in cache' });
 
-        const existingLead = leads[rowIndex];
-        const updatedLead = { ...existingLead, ...req.body, id: existingLead.id }; // preserve ID
+        const idRows = await getRows(`${SHEET_NAME}!A2:A`);
+        const sheetRowIndex = idRows.findIndex(row => row[0] === req.params.id);
+        if (sheetRowIndex === -1) return res.status(404).json({ error: 'Lead not found in sheets' });
+
+        const existingLead = leadsCache[rowIndex];
+        const updatedLead = { ...existingLead, ...req.body, id: existingLead.id };
         const rowData = mapLeadToRow(updatedLead);
         
-        // rowIndex + 2 because A1 is header, A2 is index 0
-        const rowNumber = rowIndex + 2; 
+        const rowNumber = sheetRowIndex + 2; 
         await updateRow(`${SHEET_NAME}!A${rowNumber}:U${rowNumber}`, rowData);
         
+        leadsCache[rowIndex] = updatedLead;
         res.json(updatedLead);
     } catch (error) {
         console.error('Error updating lead:', error.message || error);
@@ -156,26 +144,23 @@ router.patch('/:id', async (req, res) => {
     }
 });
 
-// DELETE a lead
 router.delete('/:id', async (req, res) => {
     try {
-        const rows = await getRows(`${SHEET_NAME}!A2:U`);
-        const leads = rows.map(mapRowToLead);
-        const rowIndex = leads.findIndex(l => l.id === req.params.id);
-        
-        if (rowIndex === -1) {
-            return res.status(404).json({ error: 'Lead not found' });
-        }
+        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+        const rowIndex = leadsCache.findIndex(l => l.id === req.params.id);
+        if (rowIndex === -1) return res.status(404).json({ error: 'Lead not found in cache' });
+
+        const idRows = await getRows(`${SHEET_NAME}!A2:A`);
+        const sheetRowIndex = idRows.findIndex(row => row[0] === req.params.id);
+        if (sheetRowIndex === -1) return res.status(404).json({ error: 'Lead not found in sheets' });
 
         const sheetId = await getSheetIdByTitle(SHEET_NAME);
-        // deleteRow expects 0-indexed values for rows
-        // Header is row 0. Row 1 in sheet is index 0 in data.
-        // So row index 0 (which is sheet row 2) is actually startIndex: 1, endIndex: 2
-        const startIndex = rowIndex + 1;
+        const startIndex = sheetRowIndex + 1;
         const endIndex = startIndex + 1;
         
         await deleteRow(sheetId, startIndex, endIndex);
         
+        leadsCache.splice(rowIndex, 1);
         res.json({ success: true, message: 'Lead deleted successfully' });
     } catch (error) {
         console.error('Error deleting lead:', error.message || error);
@@ -183,4 +168,5 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+router.initLeads = initLeads;
 module.exports = router;

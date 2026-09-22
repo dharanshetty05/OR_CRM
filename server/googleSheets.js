@@ -11,7 +11,12 @@ function getPrivateKey() {
     return key.replace(/\\n/g, '\n');
 }
 
+let cachedAuthClient = null;
+let cachedSheetsInstance = null;
+
 async function getAuthClient() {
+    if (cachedAuthClient) return cachedAuthClient;
+
     const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
     const key = getPrivateKey();
 
@@ -19,17 +24,21 @@ async function getAuthClient() {
         throw new Error('Google credentials missing. Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY in .env');
     }
 
-    return new google.auth.JWT(
+    cachedAuthClient = new google.auth.JWT(
         email,
         null,
         key,
         SCOPES
     );
+    return cachedAuthClient;
 }
 
 async function getSheetsInstance() {
+    if (cachedSheetsInstance) return cachedSheetsInstance;
+
     const auth = await getAuthClient();
-    return google.sheets({ version: 'v4', auth });
+    cachedSheetsInstance = google.sheets({ version: 'v4', auth });
+    return cachedSheetsInstance;
 }
 
 function getSpreadsheetId() {

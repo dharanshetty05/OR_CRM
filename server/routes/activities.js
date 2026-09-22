@@ -5,7 +5,15 @@ const crypto = require('crypto');
 
 const SHEET_NAME = 'ACTIVITY';
 
-// Helper to map row array to object
+let activitiesCache = null;
+
+async function initActivities() {
+    console.log('Initializing Activities cache from Google Sheets...');
+    const rows = await getRows(`${SHEET_NAME}!A2:E`);
+    activitiesCache = rows.map(mapRowToActivity).filter(a => a.id);
+    console.log(`Loaded ${activitiesCache.length} activities into cache.`);
+}
+
 function mapRowToActivity(row) {
     return {
         id: row[0] || '',
@@ -16,7 +24,6 @@ function mapRowToActivity(row) {
     };
 }
 
-// Map activity object back to row array
 function mapActivityToRow(activity) {
     return [
         activity.id || '',
@@ -27,34 +34,20 @@ function mapActivityToRow(activity) {
     ];
 }
 
-// GET all activities
-router.get('/', async (req, res) => {
-    try {
-        const rows = await getRows(`${SHEET_NAME}!A2:E`);
-        const activities = rows.map(mapRowToActivity).filter(a => a.id);
-        res.json(activities);
-    } catch (error) {
-        console.error('Error fetching activities:', error.message || error);
-        res.status(500).json({ error: 'Failed to fetch activities' });
-    }
+router.get('/', (req, res) => {
+    if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
+    res.json(activitiesCache);
 });
 
-// GET activities for a specific lead
-router.get('/:leadId', async (req, res) => {
-    try {
-        const rows = await getRows(`${SHEET_NAME}!A2:E`);
-        const activities = rows.map(mapRowToActivity).filter(a => a.id && a.lead_id === req.params.leadId);
-        res.json(activities);
-    } catch (error) {
-        console.error('Error fetching activities for lead:', error.message || error);
-        res.status(500).json({ error: 'Failed to fetch activities' });
-    }
+router.get('/:leadId', (req, res) => {
+    if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
+    const activities = activitiesCache.filter(a => a.lead_id === req.params.leadId);
+    res.json(activities);
 });
 
-// POST create an activity
 router.post('/', async (req, res) => {
     try {
-        // Validate required fields
+        if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
         if (!req.body.lead_id || typeof req.body.lead_id !== 'string') {
             return res.status(400).json({ error: 'lead_id is required and must be a string' });
         }
@@ -67,6 +60,7 @@ router.post('/', async (req, res) => {
         const rowData = mapActivityToRow(newActivity);
         
         await appendRow(`${SHEET_NAME}!A:E`, rowData);
+        activitiesCache.push(newActivity);
         res.status(201).json(newActivity);
     } catch (error) {
         console.error('Error creating activity:', error.message || error);
@@ -74,4 +68,5 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.initActivities = initActivities;
 module.exports = router;
