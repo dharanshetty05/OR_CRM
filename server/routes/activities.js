@@ -55,8 +55,8 @@ router.get('/:leadId', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         // Validate required fields
-        if (!req.body.lead_id) {
-            return res.status(400).json({ error: 'lead_id is required' });
+        if (!req.body.lead_id || typeof req.body.lead_id !== 'string') {
+            return res.status(400).json({ error: 'lead_id is required and must be a string' });
         }
 
         const newActivity = {

@@ -1040,10 +1040,14 @@ class App {
       btnSubmit.disabled = true;
       btnSubmit.textContent = 'Logging Touchpoint...';
 
-      await dbService.addActivity(actData, lead);
+      const res = await dbService.addActivity(actData, lead);
       await this.refreshData();
 
-      this.showToast('Outreach touchpoint logged successfully!', 'success');
+      if (res && res.partialSuccess) {
+        this.showToast(res.warning, 'warning');
+      } else {
+        this.showToast('Outreach touchpoint logged successfully!', 'success');
+      }
       modal.close();
     } catch (err) {
       console.error('Error logging activity:', err);

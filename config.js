@@ -12,6 +12,9 @@ const CONFIG = {
     ACTIVE_VIEW: 'swl_crm_active_view'
   },
 
+  // API Backend URL
+  API_BASE_URL: 'http://localhost:3000',
+
   // Primary Outreach Statuses
   STATUSES: [
     'NOT CONTACTED',

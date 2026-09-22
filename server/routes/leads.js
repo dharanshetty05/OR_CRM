@@ -12,16 +12,25 @@ function mapRowToLead(row) {
     return {
         id: row[0] || '',
         business_name: row[1] || '',
-        niche: row[2] || '',
-        location: row[3] || '',
-        website: row[4] || '',
-        instagram: row[5] || '',
-        phone: row[6] || '',
-        status: row[7] || '',
-        notes: row[8] || '',
-        last_contacted: row[9] || '',
-        next_followup: row[10] || '',
-        created_at: row[11] || ''
+        contact_name: row[2] || '',
+        niche: row[3] || '',
+        location: row[4] || '',
+        website: row[5] || '',
+        instagram: row[6] || '',
+        email: row[7] || '',
+        phone: row[8] || '',
+        status: row[9] || '',
+        lead_tier: row[10] || '',
+        lead_source: row[11] || '',
+        google_place_id: row[12] || '',
+        lead_score: row[13] || '',
+        opportunity_score: row[14] || '',
+        notes: row[15] || '',
+        created_at: row[16] || '',
+        last_contacted: row[17] || '',
+        next_followup: row[18] || '',
+        updated_at: row[19] || '',
+        archived_at: row[20] || ''
     };
 }
 
@@ -30,23 +39,32 @@ function mapLeadToRow(lead) {
     return [
         lead.id || '',
         lead.business_name || '',
+        lead.contact_name || '',
         lead.niche || '',
         lead.location || '',
         lead.website || '',
         lead.instagram || '',
+        lead.email || '',
         lead.phone || '',
         lead.status || '',
+        lead.lead_tier || '',
+        lead.lead_source || '',
+        lead.google_place_id || '',
+        lead.lead_score || '',
+        lead.opportunity_score || '',
         lead.notes || '',
+        lead.created_at || '',
         lead.last_contacted || '',
         lead.next_followup || '',
-        lead.created_at || ''
+        lead.updated_at || '',
+        lead.archived_at || ''
     ];
 }
 
 // GET all leads
 router.get('/', async (req, res) => {
     try {
-        const rows = await getRows(`${SHEET_NAME}!A2:L`);
+        const rows = await getRows(`${SHEET_NAME}!A2:U`);
         const leads = rows.map(mapRowToLead).filter(lead => lead.id);
         res.json(leads);
     } catch (error) {
@@ -58,7 +76,7 @@ router.get('/', async (req, res) => {
 // GET one lead
 router.get('/:id', async (req, res) => {
     try {
-        const rows = await getRows(`${SHEET_NAME}!A2:L`);
+        const rows = await getRows(`${SHEET_NAME}!A2:U`);
         const leads = rows.map(mapRowToLead);
         const lead = leads.find(l => l.id === req.params.id);
         
@@ -75,14 +93,25 @@ router.get('/:id', async (req, res) => {
 // POST create a lead
 router.post('/', async (req, res) => {
     try {
+        const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
+        if (req.body.business_name && typeof req.body.business_name !== 'string') {
+            return res.status(400).json({ error: 'business_name must be a string' });
+        }
+        if (req.body.status && !validStatuses.includes(req.body.status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (req.body.website && typeof req.body.website !== 'string') {
+            return res.status(400).json({ error: 'website must be a string' });
+        }
+
         const newLead = {
             ...req.body,
-            id: crypto.randomUUID(),
+            id: req.body.id || crypto.randomUUID(), // use provided id if available
             created_at: new Date().toISOString()
         };
         const rowData = mapLeadToRow(newLead);
         
-        await appendRow(`${SHEET_NAME}!A:L`, rowData);
+        await appendRow(`${SHEET_NAME}!A:U`, rowData);
         res.status(201).json(newLead);
     } catch (error) {
         console.error('Error creating lead:', error.message || error);
@@ -93,7 +122,18 @@ router.post('/', async (req, res) => {
 // PATCH update a lead
 router.patch('/:id', async (req, res) => {
     try {
-        const rows = await getRows(`${SHEET_NAME}!A2:L`);
+        const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
+        if (req.body.business_name && typeof req.body.business_name !== 'string') {
+            return res.status(400).json({ error: 'business_name must be a string' });
+        }
+        if (req.body.status && !validStatuses.includes(req.body.status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        if (req.body.website && typeof req.body.website !== 'string') {
+            return res.status(400).json({ error: 'website must be a string' });
+        }
+
+        const rows = await getRows(`${SHEET_NAME}!A2:U`);
         const leads = rows.map(mapRowToLead);
         const rowIndex = leads.findIndex(l => l.id === req.params.id);
         
@@ -107,7 +147,7 @@ router.patch('/:id', async (req, res) => {
         
         // rowIndex + 2 because A1 is header, A2 is index 0
         const rowNumber = rowIndex + 2; 
-        await updateRow(`${SHEET_NAME}!A${rowNumber}:L${rowNumber}`, rowData);
+        await updateRow(`${SHEET_NAME}!A${rowNumber}:U${rowNumber}`, rowData);
         
         res.json(updatedLead);
     } catch (error) {
@@ -119,7 +159,7 @@ router.patch('/:id', async (req, res) => {
 // DELETE a lead
 router.delete('/:id', async (req, res) => {
     try {
-        const rows = await getRows(`${SHEET_NAME}!A2:L`);
+        const rows = await getRows(`${SHEET_NAME}!A2:U`);
         const leads = rows.map(mapRowToLead);
         const rowIndex = leads.findIndex(l => l.id === req.params.id);
         
