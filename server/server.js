@@ -7,55 +7,136 @@ const activitiesRouter = require('./routes/activities');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const FRONTEND_ROOT = path.resolve(path.join(__dirname, '..'));
+const FRONTEND_FILES = new Set([
+    'index.html',
+    'styles.css',
+    'app.js',
+    'api.js',
+    'config.js',
+    'backup.js'
+]);
 
-let isReady = false;
+let healthStatus = 'starting';
+let loadInFlight = null;
 
-// Serve static frontend files from the project root (one directory above /server)
-app.use(express.static(path.join(__dirname, '..')));
+function getHealthPayload() {
+    return {
+        status: healthStatus,
+        ready: healthStatus === 'ready'
+    };
+}
+
+function hasWarmCache() {
+    return leadsRouter.getCache() !== null && activitiesRouter.getCache() !== null;
+}
+
+async function loadCachesFromSheets() {
+    await checkSheetsExist();
+    await Promise.all([
+        leadsRouter.reloadFromSheets(),
+        activitiesRouter.reloadFromSheets()
+    ]);
+}
+
+async function runCacheLoad() {
+    if (loadInFlight) {
+        await loadInFlight;
+        if (healthStatus !== 'ready') {
+            throw new Error('Google Sheets is unavailable');
+        }
+        return;
+    }
+
+    loadInFlight = (async () => {
+        await loadCachesFromSheets();
+        healthStatus = 'ready';
+    })();
+
+    try {
+        await loadInFlight;
+    } catch (error) {
+        if (!hasWarmCache()) {
+            healthStatus = 'error';
+        }
+        throw error;
+    } finally {
+        loadInFlight = null;
+    }
+}
+
+function startBackgroundInit() {
+    runCacheLoad().catch((error) => {
+        console.error('⚠️ Google Sheets Configuration Error:');
+        console.error(error.message);
+        console.error('The server is running, but Google Sheets data is unavailable until this is resolved.');
+    });
+}
+
+function sendIndex(res) {
+    res.sendFile(path.join(FRONTEND_ROOT, 'index.html'));
+}
+
+function sendFrontendFile(res, fileName) {
+    const safeName = path.basename(String(fileName || ''));
+    if (!FRONTEND_FILES.has(safeName)) {
+        res.status(404).end();
+        return;
+    }
+    res.sendFile(path.join(FRONTEND_ROOT, safeName));
+}
 
 app.use(express.json());
 
-// Basic health check endpoint
 app.get('/api/health', (req, res) => {
-    if (isReady) {
-        res.json({ status: 'ok', ready: true });
-    } else {
-        res.json({ status: 'initializing', ready: false });
+    res.json(getHealthPayload());
+});
+
+app.post('/api/refresh', async (req, res) => {
+    try {
+        await runCacheLoad();
+        res.json({
+            status: 'ready',
+            ready: true,
+            leads: leadsRouter.getCache(),
+            activities: activitiesRouter.getCache()
+        });
+    } catch (error) {
+        console.error('Failed to refresh Google Sheets cache:', error.message || error);
+        res.status(503).json({
+            status: 'error',
+            ready: false,
+            error: 'Google Sheets is unavailable'
+        });
     }
 });
 
-// API Routes
 app.use('/api/leads', leadsRouter);
 app.use('/api/activities', activitiesRouter);
 
-// Browser route to serve index.html explicitly
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
+app.use('/server', (req, res) => {
+    res.status(404).end();
 });
 
-// Global Error Handler
+app.get('/', (req, res) => sendIndex(res));
+app.get(['/index.html', '/Index.html'], (req, res) => sendIndex(res));
+
+app.get('/:file', (req, res, next) => {
+    sendFrontendFile(res, req.params.file);
+});
+
+app.use((req, res) => {
+    res.status(404).end();
+});
+
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err.message || err);
     res.status(500).json({ error: 'An unexpected server error occurred' });
 });
 
-// Start server and validate Google Sheets configuration
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    
-    console.log('Verifying Google Sheets configuration and initializing cache...');
-    try {
-        await checkSheetsExist();
-        console.log('✅ Google Sheets configuration is valid and required sheets exist.');
-        
-        await leadsRouter.initLeads();
-        await activitiesRouter.initActivities();
-        
-        isReady = true;
-        console.log('✅ CRM Backend is ready.');
-    } catch (error) {
-        console.error('⚠️ Google Sheets Configuration Error:');
-        console.error(error.message);
-        console.error('The server is running, but Google Sheets API calls will fail until this is resolved.');
-    }
+    console.log('Frontend available at http://localhost:' + PORT);
+    console.log('Initializing Google Sheets cache in the background...');
+    startBackgroundInit();
 });

@@ -1,6 +1,6 @@
 /**
  * ScaleWithLakshya Outreach CRM - Main Application Logic
- * Local-First single-user architecture powered by IndexedDB & BackupService.
+ * Express-served frontend with Google Sheets as the source of truth.
  */
 
 class App {
@@ -10,6 +10,7 @@ class App {
     this.activities = [];
     this.activeLead = null;
     this.currentView = 'leads';
+    this.sheetsHealth = { status: 'starting', ready: false };
     this.searchQuery = '';
     this.filters = {
       status: '',
@@ -31,34 +32,88 @@ class App {
   async init() {
     console.log(`${CONFIG.APP_NAME} v${CONFIG.APP_VERSION} initializing...`);
 
-    // Setup keyboard listeners
     window.addEventListener('keydown', this.handleKeyDown);
-
-    // Populate static dropdowns
     this.populateDropdowns();
+    this.updateSheetsStatus({ status: 'starting', ready: false });
 
-    // Show lightweight loading overlay
-    this.showLoadingOverlay('Connecting to CRM...');
+    // Show the dashboard immediately.
+    // Google Sheets will load in the background.
+    this.switchView('dashboard');
+    this.hideLoadingOverlay();
 
+    // Load backend / Google Sheets data without blocking the UI.
     try {
-      await dbService.init();
-      await this.refreshData();
-      this.switchView('dashboard');
+      await this.connectAndLoad();
     } catch (e) {
-      console.error('Failed to initialize local database:', e);
-      this.showToast('Could not load local database: ' + e.message, 'error');
-    } finally {
-      this.hideLoadingOverlay();
+      console.error('Failed to load MyCRM data:', e);
+
+      const message = this.friendlyConnectionError(e);
+
+      this.updateSheetsStatus({
+        status: 'error',
+        ready: false
+      });
+
+      this.showToast(message, 'error');
     }
   }
 
-  showLoadingOverlay(text = 'Connecting to CRM...') {
+
+  async connectAndLoad() {
+    let sawStarting = false;
+
+    await dbService.waitUntilReady((health) => {
+      this.updateSheetsStatus(health);
+
+      if (health && health.status === 'starting') {
+        sawStarting = true;
+      }
+    });
+
+    this.updateSheetsStatus({
+      status: 'ready',
+      ready: true
+    });
+
+    // First boot:
+    // The backend has already loaded Google Sheets into its cache.
+    // Read the cached data instead of triggering another Sheets request.
+    if (sawStarting) {
+      const [leads, activities] = await Promise.all([
+        dbService.getAllLeads(),
+        dbService.getAllActivities()
+      ]);
+
+      this.setDataset(leads, activities);
+      return;
+    }
+
+    // Browser refresh:
+    // Explicitly reread Google Sheets so the CRM stays up to date.
+    const { leads, activities } = await dbService.refreshFromSheets();
+
+    this.setDataset(leads, activities);
+  }
+
+  friendlyConnectionError(error) {
+    const message = (error && error.message) || '';
+    if (message.includes('unavailable')) return 'Google Sheets is unavailable';
+    if (message.includes('connecting')) return 'Google Sheets is connecting...';
+    if (message.includes('Could not connect')) return 'Could not connect to MyCRM';
+    return 'Could not connect to MyCRM';
+  }
+
+  showLoadingOverlay(text = 'Google Sheets is connecting...', { showRetry = false } = {}) {
     const overlay = document.getElementById('app-loading-overlay');
     const label = document.getElementById('app-loading-text');
+    const spinner = document.getElementById('app-loading-spinner');
+    const retry = document.getElementById('app-loading-retry');
     if (label) {
       const textSpan = label.querySelector('span') || label;
       textSpan.textContent = text;
     }
+    if (spinner) spinner.classList.toggle('hidden', showRetry);
+    if (retry) retry.classList.toggle('hidden', !showRetry);
     if (overlay) overlay.classList.remove('hidden');
   }
 
@@ -179,41 +234,113 @@ class App {
   /*                            DATA SYNCHRONIZATION                            */
   /* -------------------------------------------------------------------------- */
 
+  async refreshFromSheets() {
+    try {
+      this.showToast('Refreshing from Google Sheets...', 'info');
+      const { leads, activities } = await dbService.refreshFromSheets();
+      this.setDataset(leads, activities);
+      this.updateSheetsStatus({ status: 'ready', ready: true });
+      this.showToast('Leads refreshed from Google Sheets', 'success');
+    } catch (err) {
+      console.error('Error refreshing from Google Sheets:', err);
+      if (this.sheetsHealth.status !== 'ready') {
+        this.updateSheetsStatus({ status: 'error', ready: false });
+      }
+      this.showToast(err.message || 'Google Sheets is unavailable', 'error');
+    }
+  }
+
   async refreshData() {
     try {
       const [allLeads, allActivities] = await Promise.all([
         dbService.getAllLeads(),
         dbService.getAllActivities()
       ]);
-
-      this.allLeadsRaw = allLeads;
-      this.leads = allLeads.filter(l => !l.archived_at && l.lead_id);
-      this.activities = allActivities;
-
-      // Update sidebar count
-      const countEl = document.getElementById('nav-leads-count');
-      if (countEl) countEl.textContent = this.leads.length;
-
-      // Dynamically populate Niche filter
-      this.updateNicheFilterOptions();
-
-      // Render view
-      if (this.currentView === 'dashboard') this.renderDashboard();
-      else if (this.currentView === 'leads') this.renderLeadsTable();
-      else if (this.currentView === 'followups') this.renderFollowups();
-      else if (this.currentView === 'settings') this.renderSettings();
-
-      // Update active lead drawer if open
-      if (this.activeLead) {
-        const fresh = this.leads.find(l => l.lead_id === this.activeLead.lead_id);
-        if (fresh) {
-          this.activeLead = fresh;
-          this.renderLeadDrawerContent();
-        }
-      }
+      this.setDataset(allLeads, allActivities);
     } catch (err) {
-      console.error('Error loading CRM data from IndexedDB:', err);
-      this.showToast(`Error loading local data: ${err.message}`, 'error');
+      console.error('Error loading CRM data:', err);
+      this.showToast(this.friendlyConnectionError(err), 'error');
+    }
+  }
+
+  setDataset(allLeads, allActivities) {
+    this.allLeadsRaw = allLeads || [];
+    this.activities = allActivities || [];
+    this.rebuildVisibleState();
+  }
+
+  applyLocalLead(lead) {
+    if (!lead || !lead.lead_id) return;
+    const idx = this.allLeadsRaw.findIndex(l => l.lead_id === lead.lead_id);
+    if (idx === -1) this.allLeadsRaw.push(lead);
+    else this.allLeadsRaw[idx] = lead;
+    this.rebuildVisibleState();
+  }
+
+  applyLocalActivity(activity) {
+    if (!activity) return;
+    const existing = this.activities.findIndex(a => a.activity_id === activity.activity_id);
+    if (existing === -1) this.activities.push(activity);
+    else this.activities[existing] = activity;
+    this.rebuildVisibleState();
+  }
+
+  rebuildVisibleState() {
+    this.leads = this.allLeadsRaw.filter(l => !l.archived_at && l.lead_id);
+
+    const countEl = document.getElementById('nav-leads-count');
+    if (countEl) countEl.textContent = this.leads.length;
+
+    this.updateNicheFilterOptions();
+    this.rerenderCurrentView();
+
+    if (this.activeLead) {
+      const fresh = this.allLeadsRaw.find(l => l.lead_id === this.activeLead.lead_id);
+      if (fresh && !fresh.archived_at) {
+        this.activeLead = fresh;
+        this.renderLeadDrawerContent();
+      }
+    }
+  }
+
+  rerenderCurrentView() {
+    if (this.currentView === 'dashboard') this.renderDashboard();
+    else if (this.currentView === 'leads') this.renderLeadsTable();
+    else if (this.currentView === 'followups') this.renderFollowups();
+    else if (this.currentView === 'settings') this.renderSettings();
+  }
+
+  updateSheetsStatus(health) {
+    this.sheetsHealth = health || { status: 'starting', ready: false };
+    const status = this.sheetsHealth.status;
+    const labelEl = document.getElementById('sheets-status-label');
+    const dotEl = document.getElementById('sheets-status-dot');
+    const settingsEl = document.getElementById('settings-sheets-status');
+
+    let label = 'Connecting...';
+    let dotClass = 'bg-amber-400';
+    let settingsLabel = 'Connecting...';
+    let settingsClass = 'bg-amber-100 text-amber-800';
+
+    if (status === 'ready') {
+      label = 'Connected';
+      dotClass = 'bg-emerald-500';
+      settingsLabel = 'Connected';
+      settingsClass = 'bg-emerald-100 text-emerald-800';
+    } else if (status === 'error') {
+      label = 'Connection Error';
+      dotClass = 'bg-red-500';
+      settingsLabel = 'Connection Error';
+      settingsClass = 'bg-red-100 text-red-800';
+    }
+
+    if (labelEl) labelEl.textContent = label;
+    if (dotEl) {
+      dotEl.className = `w-2 h-2 rounded-full ${dotClass}`;
+    }
+    if (settingsEl) {
+      settingsEl.textContent = settingsLabel;
+      settingsEl.className = `text-xs px-2.5 py-1 rounded-full font-semibold ${settingsClass}`;
     }
   }
 
@@ -461,11 +588,10 @@ class App {
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               </div>
               <h4 class="text-base font-bold text-neutral-900">Your lead list is currently empty</h4>
-              <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">Add your first target prospect or import your existing CSV/JSON database in Settings.</p>
+              <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+  Add leads directly to Google Sheets, then refresh the CRM.
+</p>
               <div class="flex items-center justify-center gap-3 mt-4">
-                <button onclick="app.openAddLeadModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">
-                  Add Lead
-                </button>
                 <button onclick="app.switchView('settings')" class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
                   Import CSV / JSON
                 </button>
@@ -871,188 +997,6 @@ class App {
   /*                              MODAL OPERATIONS                              */
   /* -------------------------------------------------------------------------- */
 
-  openPasteLeadModal() {
-    const modal = document.getElementById('modal-paste-lead');
-    if (!modal) return;
-    
-    const input = document.getElementById('paste-lead-input');
-    if (input) {
-      input.value = '';
-      input.onkeydown = (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          e.preventDefault();
-          this.handlePasteLead();
-        }
-      };
-    }
-    modal.showModal();
-    if (input) input.focus();
-  }
-
-  handlePasteLead() {
-    const input = document.getElementById('paste-lead-input');
-    if (!input || !input.value.trim()) return;
-
-    const parsed = this.parsePastedLead(input.value);
-    
-    document.getElementById('modal-paste-lead').close();
-
-    const addModal = document.getElementById('modal-add-lead');
-    if (!addModal) return;
-
-    document.getElementById('add-business-name').value = parsed.businessName || '';
-    document.getElementById('add-contact-name').value = parsed.contactName || '';
-    document.getElementById('add-niche').value = parsed.niche || '';
-    document.getElementById('add-location').value = parsed.location || '';
-    document.getElementById('add-instagram').value = parsed.instagram || '';
-    document.getElementById('add-phone').value = parsed.phone || '';
-    document.getElementById('add-website').value = parsed.website || '';
-    document.getElementById('add-notes').value = parsed.notes || '';
-    
-    document.getElementById('add-status').value = 'NOT CONTACTED';
-    document.getElementById('add-tier').value = 'B';
-    document.getElementById('add-lead-source').value = 'Instagram';
-
-    addModal.showModal();
-    document.getElementById('add-business-name').focus();
-  }
-
-  parsePastedLead(text) {
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const parsed = {
-      businessName: '',
-      contactName: '',
-      niche: '',
-      location: '',
-      website: '',
-      instagram: '',
-      phone: '',
-      notes: ''
-    };
-
-    const usedLines = new Set();
-    const kvRegex = /^([^:]+):\s*(.*)$/i;
-    const urlRegex = /https?:\/\/[^\s]+/i;
-    const igRegex = /(?:instagram\.com\/|@)([a-zA-Z0-9._]+)/i;
-    const phoneRegex = /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/;
-    const matchKey = (key, targets) => targets.some(t => key.toLowerCase().includes(t));
-
-    lines.forEach((line, idx) => {
-      const match = line.match(kvRegex);
-      if (match) {
-        const key = match[1];
-        const val = match[2];
-        if (matchKey(key, ['business', 'company'])) { parsed.businessName = val; usedLines.add(idx); }
-        else if (matchKey(key, ['contact', 'owner', 'founder', 'manager'])) { parsed.contactName = val; usedLines.add(idx); }
-        else if (matchKey(key, ['niche', 'category', 'type', 'service'])) { parsed.niche = val; usedLines.add(idx); }
-        else if (matchKey(key, ['location', 'address', 'city', 'area'])) { parsed.location = val; usedLines.add(idx); }
-        else if (matchKey(key, ['web', 'site'])) { parsed.website = val; usedLines.add(idx); }
-        else if (matchKey(key, ['instagram', 'ig'])) { parsed.instagram = val; usedLines.add(idx); }
-        else if (matchKey(key, ['phone', 'mobile', 'tel'])) { parsed.phone = val; usedLines.add(idx); }
-        else if (matchKey(key, ['note'])) { parsed.notes = val; usedLines.add(idx); }
-      }
-    });
-
-    let firstUnused = true;
-    lines.forEach((line, idx) => {
-      if (usedLines.has(idx)) return;
-      
-      if (!parsed.phone && phoneRegex.test(line) && line.replace(/[^\d+]/g, '').length >= 7) {
-        parsed.phone = line;
-        usedLines.add(idx);
-        return;
-      }
-      if (!parsed.instagram && igRegex.test(line)) {
-        parsed.instagram = line;
-        usedLines.add(idx);
-        return;
-      }
-      if (!parsed.website && urlRegex.test(line) && !line.toLowerCase().includes('instagram.com')) {
-        parsed.website = line;
-        usedLines.add(idx);
-        return;
-      }
-      if (firstUnused && !parsed.businessName) {
-        parsed.businessName = line;
-        usedLines.add(idx);
-        firstUnused = false;
-        return;
-      }
-    });
-
-    const remainingNotes = lines.filter((_, idx) => !usedLines.has(idx)).join('\n');
-    if (remainingNotes) {
-      parsed.notes = parsed.notes ? parsed.notes + '\n\n' + remainingNotes : remainingNotes;
-    }
-
-    if (parsed.website && !parsed.website.startsWith('http')) parsed.website = 'https://' + parsed.website;
-    if (parsed.instagram && !parsed.instagram.startsWith('@') && !parsed.instagram.startsWith('http')) {
-      parsed.instagram = '@' + parsed.instagram;
-    }
-
-    return parsed;
-  }
-
-  openAddLeadModal() {
-    const modal = document.getElementById('modal-add-lead');
-    if (!modal) return;
-
-    document.getElementById('add-business-name').value = '';
-    document.getElementById('add-contact-name').value = '';
-    document.getElementById('add-niche').value = '';
-    document.getElementById('add-location').value = '';
-    document.getElementById('add-website').value = '';
-    document.getElementById('add-instagram').value = '';
-    document.getElementById('add-phone').value = '';
-    document.getElementById('add-notes').value = '';
-    document.getElementById('add-next-followup').value = '';
-    document.getElementById('add-status').value = 'NOT CONTACTED';
-    document.getElementById('add-lead-tier').value = 'B';
-    document.getElementById('add-lead-source').value = 'Instagram';
-
-    modal.showModal();
-  }
-
-  async submitAddLead(e) {
-    e.preventDefault();
-    const btnSubmit = document.getElementById('btn-submit-add-lead');
-    const modal = document.getElementById('modal-add-lead');
-
-    const leadData = {
-      business_name: document.getElementById('add-business-name').value,
-      contact_name: document.getElementById('add-contact-name').value,
-      niche: document.getElementById('add-niche').value,
-      location: document.getElementById('add-location').value,
-      website: document.getElementById('add-website').value,
-      instagram: document.getElementById('add-instagram').value,
-      phone: document.getElementById('add-phone').value,
-      status: document.getElementById('add-status').value,
-      lead_tier: document.getElementById('add-lead-tier').value,
-      lead_source: document.getElementById('add-lead-source').value,
-      next_follow_up_at: document.getElementById('add-next-followup').value,
-      notes: document.getElementById('add-notes').value
-    };
-
-    try {
-      btnSubmit.disabled = true;
-      btnSubmit.textContent = 'Saving Lead...';
-
-      const newLead = await dbService.createLead(leadData, this.allLeadsRaw);
-
-      await this.refreshData();
-      this.showToast(`Added lead: ${newLead.business_name}`, 'success');
-
-      modal.close();
-      this.openLeadDrawer(newLead.lead_id);
-    } catch (err) {
-      console.error('Error adding lead:', err);
-      this.showToast(err.message || 'Could not save lead.', 'error');
-    } finally {
-      btnSubmit.disabled = false;
-      btnSubmit.textContent = 'Create Lead';
-    }
-  }
-
   openEditLeadModal() {
     const lead = this.activeLead;
     if (!lead) return;
@@ -1103,8 +1047,7 @@ class App {
       btnSubmit.textContent = 'Saving Changes...';
 
       const updatedLead = await dbService.updateLead(leadId, updatedFields, this.allLeadsRaw);
-      await this.refreshData();
-
+      this.applyLocalLead(updatedLead);
       this.activeLead = updatedLead;
       this.renderLeadDrawerContent();
 
@@ -1158,7 +1101,8 @@ class App {
       btnSubmit.textContent = 'Logging Touchpoint...';
 
       const res = await dbService.addActivity(actData, lead);
-      await this.refreshData();
+      if (res && res.activity) this.applyLocalActivity(res.activity);
+      if (res && res.updatedLead) this.applyLocalLead(res.updatedLead);
 
       if (res && res.partialSuccess) {
         this.showToast(res.warning, 'warning');
@@ -1204,8 +1148,8 @@ class App {
     const nextFollowup = document.getElementById('set-followup-datetime').value;
 
     try {
-      await dbService.updateLead(lead.lead_id, { next_follow_up_at: nextFollowup }, this.allLeadsRaw);
-      await this.refreshData();
+      const updatedLead = await dbService.updateLead(lead.lead_id, { next_follow_up_at: nextFollowup }, this.allLeadsRaw);
+      this.applyLocalLead(updatedLead);
 
       this.showToast('Follow-up schedule updated', 'success');
       modal.close();
@@ -1221,8 +1165,8 @@ class App {
     if (!lead) return;
 
     try {
-      await dbService.updateLead(lead.lead_id, { next_follow_up_at: '' }, this.allLeadsRaw);
-      await this.refreshData();
+      const updatedLead = await dbService.updateLead(lead.lead_id, { next_follow_up_at: '' }, this.allLeadsRaw);
+      this.applyLocalLead(updatedLead);
       this.showToast('Follow-up cleared', 'success');
       modal.close();
     } catch (err) {
@@ -1246,14 +1190,17 @@ class App {
         notes: ''
       };
       
-      await dbService.addActivity(actData, lead);
-      
-      const statusUpper = (lead.status || '').toUpperCase();
-      if (statusUpper === 'NOT CONTACTED' || statusUpper === 'NEW' || statusUpper === 'RESEARCHING' || statusUpper === 'READY TO CONTACT') {
-        await dbService.updateLead(lead.lead_id, { status: 'DM SENT' }, this.allLeadsRaw);
+      const res = await dbService.addActivity(actData, lead);
+      if (res && res.activity) this.applyLocalActivity(res.activity);
+      if (res && res.updatedLead) this.applyLocalLead(res.updatedLead);
+
+      const current = res && res.updatedLead ? res.updatedLead : lead;
+      const statusUpper = (current.status || '').toUpperCase();
+      if (statusUpper !== 'DM SENT' && ['NOT CONTACTED', 'NEW', 'RESEARCHING', 'READY TO CONTACT'].includes((lead.status || '').toUpperCase())) {
+        const updatedLead = await dbService.updateLead(lead.lead_id, { status: 'DM SENT' }, this.allLeadsRaw);
+        this.applyLocalLead(updatedLead);
       }
       
-      await this.refreshData();
       this.showToast('Initial DM marked as sent', 'success');
     } catch (err) {
       console.error('Error marking DM sent:', err);
@@ -1280,12 +1227,14 @@ class App {
         notes: ''
       };
       
-      await dbService.addActivity(actData, lead);
+      const res = await dbService.addActivity(actData, lead);
+      if (res && res.activity) this.applyLocalActivity(res.activity);
+      if (res && res.updatedLead) this.applyLocalLead(res.updatedLead);
       
       const nextFollowup = this.getFutureLocalIso(3);
-      await dbService.updateLead(lead.lead_id, { next_follow_up_at: nextFollowup }, this.allLeadsRaw);
+      const updatedLead = await dbService.updateLead(lead.lead_id, { next_follow_up_at: nextFollowup }, this.allLeadsRaw);
+      this.applyLocalLead(updatedLead);
       
-      await this.refreshData();
       this.showToast('Follow-up logged. Next follow-up in 3 days.', 'success');
     } catch (err) {
       console.error('Error marking followed up:', err);
@@ -1300,7 +1249,7 @@ class App {
     if (confirm(`Archive "${lead.business_name}"? It will be removed from your active leads views.`)) {
       try {
         await dbService.archiveLead(lead.lead_id);
-        await this.refreshData();
+        this.applyLocalLead({ ...lead, archived_at: new Date().toISOString() });
 
         this.closeLeadDrawer();
         this.showToast(`Archived "${lead.business_name}"`, 'success');

@@ -7,11 +7,16 @@ const SHEET_NAME = 'ACTIVITY';
 
 let activitiesCache = null;
 
-async function initActivities() {
-    console.log('Initializing Activities cache from Google Sheets...');
+async function reloadFromSheets() {
+    console.log('Loading Activities cache from Google Sheets...');
     const rows = await getRows(`${SHEET_NAME}!A2:E`);
     activitiesCache = rows.map(mapRowToActivity).filter(a => a.id);
     console.log(`Loaded ${activitiesCache.length} activities into cache.`);
+    return activitiesCache;
+}
+
+function getCache() {
+    return activitiesCache;
 }
 
 function mapRowToActivity(row) {
@@ -34,20 +39,24 @@ function mapActivityToRow(activity) {
     ];
 }
 
+function cacheUnavailable(res) {
+    return res.status(503).json({ error: 'Google Sheets is unavailable' });
+}
+
 router.get('/', (req, res) => {
-    if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
+    if (activitiesCache === null) return cacheUnavailable(res);
     res.json(activitiesCache);
 });
 
 router.get('/:leadId', (req, res) => {
-    if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
+    if (activitiesCache === null) return cacheUnavailable(res);
     const activities = activitiesCache.filter(a => a.lead_id === req.params.leadId);
     res.json(activities);
 });
 
 router.post('/', async (req, res) => {
     try {
-        if (!activitiesCache) return res.status(503).json({ error: 'Cache not ready' });
+        if (activitiesCache === null) return cacheUnavailable(res);
         if (!req.body.lead_id || typeof req.body.lead_id !== 'string') {
             return res.status(400).json({ error: 'lead_id is required and must be a string' });
         }
@@ -68,5 +77,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.initActivities = initActivities;
+router.reloadFromSheets = reloadFromSheets;
+router.getCache = getCache;
 module.exports = router;

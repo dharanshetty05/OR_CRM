@@ -40,19 +40,23 @@
 <body class="h-full flex flex-col antialiased text-neutral-900 bg-[#fbfbfa]">
 
   <!-- Startup Loading Overlay -->
-  <div id="app-loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 hidden">
+  <div id="app-loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6">
     <div class="flex flex-col items-center max-w-sm text-center">
       <div class="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-md mb-4 animate-pulse">
         SWL
       </div>
       <h3 class="text-lg font-bold text-neutral-900 mb-1">ScaleWithLakshya CRM</h3>
       <p id="app-loading-text" class="text-xs text-neutral-500 font-medium flex items-center justify-center gap-2">
-        <svg class="w-4 h-4 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
+        <svg id="app-loading-spinner" class="w-4 h-4 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span>Connecting to CRM...</span>
+        <span>Google Sheets is connecting...</span>
       </p>
+      <button id="app-loading-retry" type="button" onclick="app.init()"
+        class="hidden mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm">
+        Retry
+      </button>
     </div>
   </div>
 
@@ -81,6 +85,15 @@
 
         <!-- Navigation Links -->
         <nav class="p-3 space-y-1">
+          <button id="nav-dashboard" onclick="app.switchView('dashboard')"
+            class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
+            <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            <span>Dashboard</span>
+          </button>
+
           <button id="nav-leads" onclick="app.switchView('leads')"
             class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <div class="flex items-center gap-3">
@@ -121,10 +134,10 @@
       <!-- Footer Local DB Status -->
       <div class="p-4 border-t border-neutral-200 bg-neutral-50/50">
         <div id="sidebar-db-status" class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="sheets-status-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
           <div class="truncate text-xs">
-            <span class="font-medium text-neutral-900 block truncate">Google Sheets Connected</span>
-            <span class="text-neutral-500 block truncate text-[11px]">Cloud-synced CRM</span>
+            <span id="sheets-status-label" class="font-medium text-neutral-900 block truncate">Connecting...</span>
+            <span class="text-neutral-500 block truncate text-[11px]">Google Sheets</span>
           </div>
         </div>
       </div>
@@ -132,6 +145,13 @@
 
     <!-- Mobile Navigation Bar -->
     <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex justify-around py-2 z-30">
+      <button onclick="app.switchView('dashboard')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        <span>Dashboard</span>
+      </button>
       <button onclick="app.switchView('leads')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -170,27 +190,13 @@
             <p class="text-sm text-neutral-500">Real-time overview of your Instagram DM outreach & lead pipeline.</p>
           </div>
           <div class="flex items-center gap-3">
-            <button onclick="app.refreshData()"
+            <button onclick="app.refreshFromSheets()"
               class="flex items-center gap-2 px-3.5 py-2 border border-neutral-200 bg-white hover:bg-neutral-50 rounded-lg text-sm font-medium text-neutral-700 shadow-sm transition-colors">
               <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               <span>Refresh</span>
-            </button>
-            <button onclick="app.openPasteLeadModal()"
-              class="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-900 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <span>Paste Lead</span>
-            </button>
-            <button onclick="app.openAddLeadModal()"
-              class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Lead</span>
             </button>
           </div>
         </div>
@@ -275,15 +281,6 @@
           <div>
             <h2 class="text-2xl font-bold text-neutral-900">Leads</h2>
             <p class="text-sm text-neutral-500">Manage, search, and execute Instagram outreach for your prospects.</p>
-          </div>
-          <div class="flex items-center gap-3">
-            <button onclick="app.openAddLeadModal()"
-              class="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm font-medium text-white shadow-sm transition-colors">
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Lead</span>
-            </button>
           </div>
         </div>
 
@@ -458,7 +455,7 @@
       <section id="view-settings" class="hidden p-6 md:p-8 space-y-6 max-w-4xl mx-auto w-full">
         <div>
           <h2 class="text-2xl font-bold text-neutral-900">Settings & Data Management</h2>
-          <p class="text-sm text-neutral-500">Manage local storage, database backups, and import/export operations.</p>
+          <p class="text-sm text-neutral-500">Manage Google Sheets backups and import/export operations.</p>
         </div>
 
         <div class="space-y-6">
@@ -469,7 +466,7 @@
                 <h3 class="text-base font-semibold text-neutral-900">CRM Database</h3>
                 <p class="text-xs text-neutral-500">Your CRM data is stored in Google Sheets through the local Node.js backend.</p>
               </div>
-              <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold">Google Sheets Active</span>
+              <span id="settings-sheets-status" class="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">Connecting...</span>
             </div>
 
             <div class="grid grid-cols-3 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-200 text-xs">
@@ -714,131 +711,6 @@
     <!-- ==================================================================== -->
     <!--                               MODALS                                 -->
     <!-- ==================================================================== -->
-
-    <!-- Modal: Paste Lead -->
-    <dialog id="modal-paste-lead" class="rounded-xl p-0 w-full max-w-lg bg-white shadow-2xl border border-neutral-200">
-      <form method="dialog" class="flex flex-col">
-        <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
-          <div>
-            <h3 class="text-lg font-bold text-neutral-900">Paste Lead</h3>
-            <p class="text-xs text-neutral-500">Paste business info to auto-fill the lead form.</p>
-          </div>
-          <button type="button" onclick="document.getElementById('modal-paste-lead').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div class="p-6">
-          <textarea id="paste-lead-input" rows="8" placeholder="Paste business details here... (e.g. name, location, niche, instagram, phone)" 
-            class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm resize-none"></textarea>
-          <div class="flex items-center gap-2 mt-4 justify-end">
-            <span class="text-xs text-neutral-400 mr-2 hidden sm:inline">Press Ctrl+Enter to parse</span>
-            <button type="button" onclick="document.getElementById('modal-paste-lead').close()" class="px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg text-sm font-semibold hover:bg-neutral-50">Cancel</button>
-            <button type="button" onclick="app.handlePasteLead()" class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 shadow-sm">Parse & Fill</button>
-          </div>
-        </div>
-      </form>
-    </dialog>
-
-    <!-- Modal: Add Lead -->
-    <dialog id="modal-add-lead" class="rounded-xl p-0 w-full max-w-2xl bg-white shadow-2xl border border-neutral-200">
-      <form method="dialog" onsubmit="app.submitAddLead(event)" class="flex flex-col max-h-[90vh]">
-        <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
-          <div>
-            <h3 class="text-lg font-bold text-neutral-900">Add New Lead</h3>
-            <p class="text-xs text-neutral-500">Record a new lead into your CRM.</p>
-          </div>
-          <button type="button" onclick="document.getElementById('modal-add-lead').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="p-6 overflow-y-auto space-y-4 text-sm">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label for="add-business-name" class="block text-xs font-semibold text-neutral-700 mb-1">Business Name *</label>
-              <input type="text" id="add-business-name" required placeholder="e.g. Apex Performance"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-contact-name" class="block text-xs font-semibold text-neutral-700 mb-1">Contact Name</label>
-              <input type="text" id="add-contact-name" placeholder="e.g. Marcus Vance"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-niche" class="block text-xs font-semibold text-neutral-700 mb-1">Niche *</label>
-              <input type="text" id="add-niche" required placeholder="e.g. Solar Energy, MedSpa, HVAC"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-location" class="block text-xs font-semibold text-neutral-700 mb-1">Location *</label>
-              <input type="text" id="add-location" required placeholder="e.g. Austin, TX"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram Handle *</label>
-              <input type="text" id="add-instagram" placeholder="@handle or Instagram link"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-website" class="block text-xs font-semibold text-neutral-700 mb-1">Website</label>
-              <input type="text" id="add-website" placeholder="https://example.com"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-phone" class="block text-xs font-semibold text-neutral-700 mb-1">Phone</label>
-              <input type="tel" id="add-phone" placeholder="+1 555-123-4567"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="add-status" class="block text-xs font-semibold text-neutral-700 mb-1">Status *</label>
-              <select id="add-status" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Dynamically populated -->
-              </select>
-            </div>
-            <div>
-              <label for="add-lead-tier" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Tier</label>
-              <select id="add-lead-tier"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <option value="A">Tier A</option>
-                <option value="B" selected>Tier B</option>
-                <option value="C">Tier C</option>
-              </select>
-            </div>
-            <div>
-              <label for="add-lead-source" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Source</label>
-              <select id="add-lead-source"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Dynamically populated -->
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label for="add-next-followup" class="block text-xs font-semibold text-neutral-700 mb-1">Next Follow-up Date & Time</label>
-            <input type="datetime-local" id="add-next-followup"
-              class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-          </div>
-
-          <div>
-            <label for="add-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes & Cold Angle</label>
-            <textarea id="add-notes" rows="3" placeholder="Context, pain points, IG DM angle..."
-              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
-          </div>
-        </div>
-
-        <div class="p-5 border-t border-neutral-200 flex items-center justify-end gap-3 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-add-lead').close()"
-            class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" id="btn-submit-add-lead"
-            class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Create Lead</button>
-        </div>
-      </form>
-    </dialog>
 
     <!-- Modal: Edit Lead -->
     <dialog id="modal-edit-lead" class="rounded-xl p-0 w-full max-w-2xl bg-white shadow-2xl border border-neutral-200">

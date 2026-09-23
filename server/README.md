@@ -1,6 +1,6 @@
 # CRM Node.js Backend
 
-This is a tiny Node.js backend for the CRM, designed to intermediate between the frontend and Google Sheets. It securely authenticates using a Google Cloud Service Account, keeping all credentials strictly server-side.
+Tiny Express backend between the MyCRM frontend and Google Sheets. Credentials stay server-side. The same process serves the frontend from the repository root.
 
 ## Setup Instructions
 
@@ -33,32 +33,34 @@ To connect this backend to Google Sheets, you need to perform the following step
 5. Copy the Spreadsheet ID from the URL. (It's the long string between `/d/` and `/edit`).
 
 ### 5. Environment Variables
-1. Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-2. Fill in the values in `.env`:
+1. Create `server/.env` (do not commit this file).
+2. Fill in:
    - `GOOGLE_SHEET_ID`: The ID copied from the Google Sheet URL.
    - `GOOGLE_SERVICE_ACCOUNT_EMAIL`: The `client_email` from the JSON key.
    - `GOOGLE_PRIVATE_KEY`: The `private_key` from the JSON key. Keep the quotes around it, e.g. `"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"`.
 
 ### 6. Run the Server
+
+Preferred: double-click `start-crm.bat` in the project root.
+
+Or from this directory:
 ```bash
-npm run dev
+npm start
 ```
 
-The server will start on port 3000 (or the port specified in `.env`) and verify the Google Sheets connection on startup.
+Express listens immediately and serves the frontend at `http://localhost:3000`. Google Sheets caches load in the background.
 
 ## API Endpoints
 
-- `GET /api/health` - Server health check
-- `GET /api/leads` - Get all leads
+- `GET /api/health` - `{ status: "starting"|"ready"|"error", ready: boolean }`
+- `POST /api/refresh` - Reload LEADS and ACTIVITY from Google Sheets into memory
+- `GET /api/leads` - Get all leads (memory cache)
 - `GET /api/leads/:id` - Get a specific lead
 - `POST /api/leads` - Create a new lead
 - `PATCH /api/leads/:id` - Update a lead
 - `DELETE /api/leads/:id` - Delete a lead
-- `GET /api/activities` - Get all activities
+- `GET /api/activities` - Get all activities (memory cache)
 - `GET /api/activities/:leadId` - Get activities for a lead
 - `POST /api/activities` - Create an activity
 
-**Note:** Frontend integration has NOT been performed yet. The current frontend still operates independently of this backend.
+Normal GET requests use the in-memory cache. Only `POST /api/refresh` (and process startup) reread Google Sheets.

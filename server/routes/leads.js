@@ -7,11 +7,16 @@ const SHEET_NAME = 'LEADS';
 
 let leadsCache = null;
 
-async function initLeads() {
-    console.log('Initializing Leads cache from Google Sheets...');
+async function reloadFromSheets() {
+    console.log('Loading Leads cache from Google Sheets...');
     const rows = await getRows(`${SHEET_NAME}!A2:U`);
     leadsCache = rows.map(mapRowToLead).filter(lead => lead.id);
     console.log(`Loaded ${leadsCache.length} leads into cache.`);
+    return leadsCache;
+}
+
+function getCache() {
+    return leadsCache;
 }
 
 function mapRowToLead(row) {
@@ -66,13 +71,17 @@ function mapLeadToRow(lead) {
     ];
 }
 
+function cacheUnavailable(res) {
+    return res.status(503).json({ error: 'Google Sheets is unavailable' });
+}
+
 router.get('/', (req, res) => {
-    if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+    if (leadsCache === null) return cacheUnavailable(res);
     res.json(leadsCache);
 });
 
 router.get('/:id', (req, res) => {
-    if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+    if (leadsCache === null) return cacheUnavailable(res);
     const lead = leadsCache.find(l => l.id === req.params.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
     res.json(lead);
@@ -80,7 +89,7 @@ router.get('/:id', (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+        if (leadsCache === null) return cacheUnavailable(res);
         const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
         if (req.body.business_name && typeof req.body.business_name !== 'string') {
             return res.status(400).json({ error: 'business_name must be a string' });
@@ -110,7 +119,7 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
     try {
-        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+        if (leadsCache === null) return cacheUnavailable(res);
         const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
         if (req.body.business_name && typeof req.body.business_name !== 'string') {
             return res.status(400).json({ error: 'business_name must be a string' });
@@ -146,7 +155,7 @@ router.patch('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
     try {
-        if (!leadsCache) return res.status(503).json({ error: 'Cache not ready' });
+        if (leadsCache === null) return cacheUnavailable(res);
         const rowIndex = leadsCache.findIndex(l => l.id === req.params.id);
         if (rowIndex === -1) return res.status(404).json({ error: 'Lead not found in cache' });
 
@@ -168,5 +177,6 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-router.initLeads = initLeads;
+router.reloadFromSheets = reloadFromSheets;
+router.getCache = getCache;
 module.exports = router;

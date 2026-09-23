@@ -1,4 +1,5 @@
 node_modules/
-.env.*
-credentials.json
 .env
+.env.local
+.env.*.local
+credentials.json

@@ -1,19 +1,26 @@
 # ScaleWithLakshya Outreach CRM
 
-A streamlined, personal single-user **Outreach CRM** built specifically for **ScaleWithLakshya**.
+A personal single-user **Outreach CRM** for **ScaleWithLakshya**.
 
-The application runs 100% locally in your browser with **zero authentication**, **zero setup**, and **zero external network dependencies**, storing your lead database directly inside browser-native **IndexedDB**.
+Google Sheets is the source of truth. A small Express backend caches lead and activity data in memory and serves the MyCRM frontend from the same origin.
+
+```text
+Google Sheets  →  Express backend (memory cache)  →  MyCRM frontend
+```
+
+Start the app with `start-crm.bat`. You do not need VS Code, Live Server, or a separate frontend server.
 
 ---
 
 ## Key Highlights
 
-- **Zero Auth / Zero Login**: Opens directly into your CRM every time you launch or refresh the application.
-- **Local-First Persistence**: Data is stored safely in browser IndexedDB (`SWL_CRM_DB`) across refreshes and restarts.
-- **Instagram DM Workflow**: Fast, 1-click access to open prospect Instagram profiles (`https://instagram.com/handle`), log DM touchpoints, and track outreach status.
-- **Data Backup & Transfer**: Built-in 1-click **Export Full Backup (JSON)**, **Export Leads (CSV)**, and **Import Data (JSON/CSV)** capabilities in Settings.
-- **Follow-up Desk**: Triage Overdue, Due Today, and Upcoming outreach touches with 1-click rescheduling.
-- **Linear/Attio Aesthetic**: Clean, responsive, keyboard-accessible UI with dark-mode toast notifications and smooth slide-over lead detail drawers.
+- **One launcher**: Double-click `start-crm.bat` to start Express and open the browser.
+- **Same-origin app**: The UI is served at `http://localhost:3000` and calls `/api` on the same host.
+- **Google Sheets source of truth**: The backend reads LEADS and ACTIVITY from Sheets into an in-memory cache.
+- **Explicit refresh**: Dashboard **Refresh** reloads both sheets from Google and replaces the cache.
+- **Instagram DM Workflow**: Open prospect Instagram profiles, log DM touchpoints, and track outreach status.
+- **Follow-up Desk**: Triage Overdue, Due Today, and Upcoming outreach with rescheduling.
+- **CSV import/export**: Backup and import tools remain available in Settings.
 
 ---
 
@@ -40,32 +47,28 @@ The application runs 100% locally in your browser with **zero authentication**, 
 
 ---
 
-## Data Model & Backup
+## Data Model
 
-### IndexedDB Object Stores
-
-- **`leads`**: `lead_id`, `business_name`, `contact_name`, `niche`, `location`, `website`, `instagram`, `email`, `phone`, `status`, `lead_tier`, `lead_source`, `notes`, `last_contacted_at`, `next_follow_up_at`, `date_added`, `updated_at`, `archived_at`.
-- **`activities`**: `activity_id`, `lead_id`, `activity_at`, `activity_type`, `channel`, `summary`, `outcome`, `notes`.
-
-### Export / Import
-
-In **Settings**:
-- **Export Full Backup (JSON)**: Creates a complete JSON snapshot file containing all leads and activities.
-- **Export Leads (CSV)**: Generates a CSV file of active leads for viewing in Excel or Google Sheets.
-- **Import JSON / CSV**: Restores a JSON backup file or imports leads directly from a CSV file.
+Lead and activity records live in Google Sheets tabs named **LEADS** and **ACTIVITY**. The Node backend maps those rows into the CRM UI. The browser does not store a separate database.
 
 ---
 
 ## Running Locally
 
-Serve the directory using any static HTTP server (or open `index.html` directly):
+1. Install [Node.js](https://nodejs.org) (includes npm).
+2. Configure `server/.env` with the Google service account and spreadsheet ID. See `server/README.md`.
+3. Double-click `start-crm.bat`.
+
+The launcher starts Express, waits until `http://localhost:3000` responds, and opens the browser.
+
+You can also start the backend manually:
 
 ```bash
-# Python
-python -m http.server 8000
-
-# Or npx
-npx serve .
+cd server
+npm install
+npm start
 ```
 
-Open `http://localhost:8000` in your browser.
+Then open `http://localhost:3000`.
+
+Do **not** open `index.html` as a file, and do **not** use Live Server or a Python HTTP server. Those split the frontend from the API.

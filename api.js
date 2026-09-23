@@ -1,11 +1,11 @@
 /**
  * ScaleWithLakshya Outreach CRM - API Repository Service
- * Replaces db.js to communicate with Node.js backend.
+ * Talks to the Express backend over same-origin /api routes.
  */
 
 class APIService {
   constructor() {
-    this.baseUrl = window.CONFIG?.API_BASE_URL || 'http://localhost:3000';
+    this.baseUrl = String(window.CONFIG?.API_BASE_URL || '/api').replace(/\/$/, '');
   }
 
   async _fetch(endpoint, options = {}) {
@@ -20,38 +20,72 @@ class APIService {
       
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || `Server responded with ${response.status}`);
+        if (response.status === 503) {
+          throw new Error(err.error || 'Google Sheets is unavailable');
+        }
+        throw new Error(err.error || `Could not complete the request (${response.status})`);
       }
       
       return await response.json();
     } catch (error) {
       if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        throw new Error('CRM backend is not running. Please start the Node.js server.');
+        throw new Error('Could not connect to MyCRM');
       }
       throw error;
     }
   }
 
-  /**
-   * Ping backend to check if it's available.
-   */
-  async init() {
-    let retries = 0;
-    while (retries < 20) {
-      try {
-        const res = await this._fetch('/api/health');
-        if (res.ready) {
-          return true;
-        }
-      } catch (e) {
-        if (!e.message.includes('not running')) {
-          throw new Error('Could not connect to the backend API. ' + e.message);
-        }
+  async getHealth() {
+    try {
+      const response = await fetch(`${this.baseUrl}/health`);
+      if (!response.ok) {
+        throw new Error('Could not connect to MyCRM');
       }
-      await new Promise(r => setTimeout(r, 1000));
-      retries++;
+      return await response.json();
+    } catch (error) {
+      if (error.message === 'Could not connect to MyCRM') throw error;
+      throw new Error('Could not connect to MyCRM');
     }
-    throw new Error('CRM backend is taking too long to start. Please try again.');
+  }
+
+  async waitUntilReady(onStatus) {
+    let lastError = null;
+    let delayMs = 0;
+
+    for (let attempt = 0; attempt < 15; attempt++) {
+      if (delayMs) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+      try {
+        const health = await this.getHealth();
+        if (typeof onStatus === 'function') onStatus(health);
+        if (health.status === 'ready' && health.ready) {
+          return health;
+        }
+        if (health.status === 'error') {
+          throw new Error('Google Sheets is unavailable');
+        }
+        lastError = new Error('Google Sheets is connecting...');
+      } catch (e) {
+        lastError = e;
+        if (e.message === 'Google Sheets is unavailable') throw e;
+      }
+      delayMs = delayMs === 0 ? 400 : Math.min(3000, Math.round(delayMs * 1.5));
+    }
+
+    throw lastError || new Error('Could not connect to MyCRM');
+  }
+
+  async refreshFromSheets() {
+    const payload = await this._fetch('/refresh', { method: 'POST' });
+    return {
+      leads: (payload.leads || []).map(this._mapBackendLeadToFrontend),
+      activities: (payload.activities || []).map(this._mapBackendActivityToFrontend)
+    };
+  }
+
+  async init() {
+    return this.waitUntilReady();
   }
 
   /* -------------------------------------------------------------------------- */
@@ -59,13 +93,13 @@ class APIService {
   /* -------------------------------------------------------------------------- */
 
   async getAllLeads() {
-    const leads = await this._fetch('/api/leads');
+    const leads = await this._fetch('/leads');
     // Map backend to frontend schema (most fields align because backend was updated)
     return leads.map(this._mapBackendLeadToFrontend);
   }
 
   async getLeadById(leadId) {
-    const lead = await this._fetch(`/api/leads/${leadId}`);
+    const lead = await this._fetch(`/leads/${leadId}`);
     return this._mapBackendLeadToFrontend(lead);
   }
 
@@ -77,7 +111,7 @@ class APIService {
     }
 
     const payload = this._mapFrontendLeadToBackend(leadData);
-    const created = await this._fetch('/api/leads', {
+    const created = await this._fetch('/leads', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -105,7 +139,7 @@ class APIService {
     merged.updated_at = new Date().toISOString();
 
     const payload = this._mapFrontendLeadToBackend(merged);
-    const updated = await this._fetch(`/api/leads/${leadId}`, {
+    const updated = await this._fetch(`/leads/${leadId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload)
     });
@@ -118,7 +152,7 @@ class APIService {
   }
 
   async deleteLeadPermanently(leadId) {
-    await this._fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+    await this._fetch(`/leads/${leadId}`, { method: 'DELETE' });
     return { success: true };
   }
 
@@ -127,14 +161,14 @@ class APIService {
   /* -------------------------------------------------------------------------- */
 
   async getAllActivities() {
-    const activities = await this._fetch('/api/activities');
+    const activities = await this._fetch('/activities');
     return activities.map(this._mapBackendActivityToFrontend);
   }
 
   async addActivity(activityData, currentLead = null) {
     const payload = this._mapFrontendActivityToBackend(activityData);
     
-    const activityRecord = await this._fetch('/api/activities', {
+    const activityRecord = await this._fetch('/activities', {
       method: 'POST',
       body: JSON.stringify(payload)
     });

@@ -12,8 +12,8 @@ const CONFIG = {
     ACTIVE_VIEW: 'swl_crm_active_view'
   },
 
-  // API Backend URL
-  API_BASE_URL: 'http://localhost:3000',
+  // Same-origin API prefix served by Express
+  API_BASE_URL: '/api',
 
   // Primary Outreach Statuses
   STATUSES: [
