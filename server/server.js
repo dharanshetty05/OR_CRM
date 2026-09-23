@@ -14,7 +14,6 @@ const FRONTEND_FILES = new Set([
     'app.js',
     'api.js',
     'config.js',
-    'backup.js'
 ]);
 
 let healthStatus = 'starting';

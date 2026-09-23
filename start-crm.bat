@@ -60,20 +60,22 @@ if not exist "node_modules\" (
 
 REM ==================================================
 REM Check whether CRM is already running
+REM (Reachability only - the dashboard renders instantly even
+REM  while Google Sheets is still loading in the background,
+REM  so we don't wait for the full "ready" state here.)
 REM ==================================================
 
 echo Checking whether MyCRM is already running...
 
-set "READY="
+set "UP="
 
-for /f "delims=" %%A in ('powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Uri 'http://localhost:3000/api/health' -TimeoutSec 2; if ($r.ready -eq $true) { 'TRUE' } else { 'FALSE' } } catch { 'FALSE' }"') do (
-    set "READY=%%A"
+for /f "delims=" %%A in ('powershell -NoProfile -Command "try { Invoke-RestMethod -Uri 'http://localhost:3000/api/health' -TimeoutSec 2 | Out-Null; 'TRUE' } catch { 'FALSE' }"') do (
+    set "UP=%%A"
 )
 
-if /I "%READY%"=="TRUE" (
+if /I "%UP%"=="TRUE" (
     echo MyCRM is already running.
     echo Opening MyCRM...
-    timeout /t 1 /nobreak >nul
     explorer.exe "http://localhost:3000"
     exit /b 0
 )
@@ -87,10 +89,13 @@ echo Starting MyCRM backend...
 start "ScaleWithLakshya MyCRM Backend" /MIN cmd /c "npm start"
 
 REM ==================================================
-REM Wait for backend to become ready
+REM Wait for the server to accept connections.
+REM The dashboard shell loads instantly once Express is up;
+REM Google Sheets data fills in afterward in the background,
+REM so we open the browser as soon as the server responds.
 REM ==================================================
 
-echo Waiting for MyCRM to become ready...
+echo Waiting for MyCRM to start...
 
 set /a RETRY=0
 
@@ -98,21 +103,18 @@ set /a RETRY=0
 
 timeout /t 1 /nobreak >nul
 
-set "READY="
+set "UP="
 
-for /f "delims=" %%A in ('powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Uri 'http://localhost:3000/api/health' -TimeoutSec 2; if ($r.ready -eq $true) { 'TRUE' } else { 'FALSE' } } catch { 'FALSE' }"') do (
-    set "READY=%%A"
+for /f "delims=" %%A in ('powershell -NoProfile -Command "try { Invoke-RestMethod -Uri 'http://localhost:3000/api/health' -TimeoutSec 2 | Out-Null; 'TRUE' } catch { 'FALSE' }"') do (
+    set "UP=%%A"
 )
 
-if /I "%READY%"=="TRUE" (
+if /I "%UP%"=="TRUE" (
     echo.
     echo ==========================================
-    echo      MyCRM is ready!
-    echo      Opening dashboard...
+    echo      MyCRM is up! Opening dashboard...
     echo ==========================================
     echo.
-
-    timeout /t 1 /nobreak >nul
 
     explorer.exe "http://localhost:3000"
 
@@ -121,7 +123,7 @@ if /I "%READY%"=="TRUE" (
 
 set /a RETRY+=1
 
-if %RETRY% LSS 30 (
+if %RETRY% LSS 20 (
     goto WAIT_LOOP
 )
 
@@ -131,10 +133,16 @@ REM ==================================================
 
 echo.
 echo ==========================================
-echo      ERROR: MyCRM did not become ready
+echo      ERROR: MyCRM did not start
 echo ==========================================
 echo.
-echo Check the MyCRM backend window for the error.
+echo Check the "ScaleWithLakshya MyCRM Backend" window for the
+echo actual error message. Common causes:
+echo   - Port 3000 is already used by another application.
+echo     Close it, or set a different PORT in server\.env
+echo   - Google credentials are missing/invalid in server\.env
+echo     (the dashboard can still start without them - this
+echo     error means the server itself failed to launch).
 echo.
 echo Expected URL:
 echo http://localhost:3000

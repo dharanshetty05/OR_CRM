@@ -148,20 +148,10 @@ async function deleteRow(sheetId, startIndex, endIndex) {
     }
 }
 
-async function getSheetIdByTitle(title) {
-    const sheets = await getSheetsInstance();
-    const spreadsheetId = getSpreadsheetId();
-    const response = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheet = response.data.sheets.find(s => s.properties.title === title);
-    if (!sheet) throw new Error(`Sheet with title ${title} not found`);
-    return sheet.properties.sheetId;
-}
-
 module.exports = {
     checkSheetsExist,
     getRows,
     appendRow,
     updateRow,
     deleteRow,
-    getSheetIdByTitle
 };

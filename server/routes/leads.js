@@ -1,16 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const { getRows, appendRow, updateRow, deleteRow, getSheetIdByTitle } = require('../googleSheets');
+const { getRows, updateRow } = require('../googleSheets');
 const crypto = require('crypto');
 
 const SHEET_NAME = 'LEADS';
 
 let leadsCache = null;
+let leadRowMap = new Map();
+let maxRow = 1;
 
 async function reloadFromSheets() {
     console.log('Loading Leads cache from Google Sheets...');
     const rows = await getRows(`${SHEET_NAME}!A2:U`);
-    leadsCache = rows.map(mapRowToLead).filter(lead => lead.id);
+    
+    leadsCache = [];
+    leadRowMap.clear();
+    maxRow = 1;
+    
+    rows.forEach((row, index) => {
+        const rowNum = index + 2;
+        if (rowNum > maxRow) maxRow = rowNum;
+        
+        const lead = mapRowToLead(row);
+        if (lead.id) {
+            leadsCache.push(lead);
+            leadRowMap.set(lead.id, rowNum);
+        }
+    });
+    
     console.log(`Loaded ${leadsCache.length} leads into cache.`);
     return leadsCache;
 }
@@ -87,36 +104,6 @@ router.get('/:id', (req, res) => {
     res.json(lead);
 });
 
-router.post('/', async (req, res) => {
-    try {
-        if (leadsCache === null) return cacheUnavailable(res);
-        const validStatuses = ['NOT CONTACTED', 'DM SENT', 'REPLIED', 'CALL BOOKED', 'WON', 'LOST'];
-        if (req.body.business_name && typeof req.body.business_name !== 'string') {
-            return res.status(400).json({ error: 'business_name must be a string' });
-        }
-        if (req.body.status && !validStatuses.includes(req.body.status)) {
-            return res.status(400).json({ error: 'Invalid status' });
-        }
-        if (req.body.website && typeof req.body.website !== 'string') {
-            return res.status(400).json({ error: 'website must be a string' });
-        }
-
-        const newLead = {
-            ...req.body,
-            id: req.body.id || crypto.randomUUID(),
-            created_at: new Date().toISOString()
-        };
-        const rowData = mapLeadToRow(newLead);
-        
-        await appendRow(`${SHEET_NAME}!A:U`, rowData);
-        leadsCache.push(newLead);
-        res.status(201).json(newLead);
-    } catch (error) {
-        console.error('Error creating lead:', error.message || error);
-        res.status(500).json({ error: 'Failed to create lead' });
-    }
-});
-
 router.patch('/:id', async (req, res) => {
     try {
         if (leadsCache === null) return cacheUnavailable(res);
@@ -134,15 +121,13 @@ router.patch('/:id', async (req, res) => {
         const rowIndex = leadsCache.findIndex(l => l.id === req.params.id);
         if (rowIndex === -1) return res.status(404).json({ error: 'Lead not found in cache' });
 
-        const idRows = await getRows(`${SHEET_NAME}!A2:A`);
-        const sheetRowIndex = idRows.findIndex(row => row[0] === req.params.id);
-        if (sheetRowIndex === -1) return res.status(404).json({ error: 'Lead not found in sheets' });
+        const rowNumber = leadRowMap.get(req.params.id);
+        if (!rowNumber) return res.status(404).json({ error: 'Lead not found in sheets mapping' });
 
         const existingLead = leadsCache[rowIndex];
         const updatedLead = { ...existingLead, ...req.body, id: existingLead.id };
         const rowData = mapLeadToRow(updatedLead);
         
-        const rowNumber = sheetRowIndex + 2; 
         await updateRow(`${SHEET_NAME}!A${rowNumber}:U${rowNumber}`, rowData);
         
         leadsCache[rowIndex] = updatedLead;
@@ -150,30 +135,6 @@ router.patch('/:id', async (req, res) => {
     } catch (error) {
         console.error('Error updating lead:', error.message || error);
         res.status(500).json({ error: 'Failed to update lead' });
-    }
-});
-
-router.delete('/:id', async (req, res) => {
-    try {
-        if (leadsCache === null) return cacheUnavailable(res);
-        const rowIndex = leadsCache.findIndex(l => l.id === req.params.id);
-        if (rowIndex === -1) return res.status(404).json({ error: 'Lead not found in cache' });
-
-        const idRows = await getRows(`${SHEET_NAME}!A2:A`);
-        const sheetRowIndex = idRows.findIndex(row => row[0] === req.params.id);
-        if (sheetRowIndex === -1) return res.status(404).json({ error: 'Lead not found in sheets' });
-
-        const sheetId = await getSheetIdByTitle(SHEET_NAME);
-        const startIndex = sheetRowIndex + 1;
-        const endIndex = startIndex + 1;
-        
-        await deleteRow(sheetId, startIndex, endIndex);
-        
-        leadsCache.splice(rowIndex, 1);
-        res.json({ success: true, message: 'Lead deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting lead:', error.message || error);
-        res.status(500).json({ error: 'Failed to delete lead' });
     }
 });
 

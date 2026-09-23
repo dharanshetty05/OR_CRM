@@ -9,6 +9,7 @@ class App {
     this.allLeadsRaw = [];
     this.activities = [];
     this.activeLead = null;
+    this.isInitialDataLoading = true;
     this.currentView = 'leads';
     this.sheetsHealth = { status: 'starting', ready: false };
     this.searchQuery = '';
@@ -17,7 +18,8 @@ class App {
       niche: '',
       tier: '',
       source: '',
-      followup: ''
+      followup: '',
+      today: false
     };
 
     // Bind methods
@@ -60,14 +62,8 @@ class App {
 
 
   async connectAndLoad() {
-    let sawStarting = false;
-
     await dbService.waitUntilReady((health) => {
       this.updateSheetsStatus(health);
-
-      if (health && health.status === 'starting') {
-        sawStarting = true;
-      }
     });
 
     this.updateSheetsStatus({
@@ -75,22 +71,13 @@ class App {
       ready: true
     });
 
-    // First boot:
-    // The backend has already loaded Google Sheets into its cache.
-    // Read the cached data instead of triggering another Sheets request.
-    if (sawStarting) {
-      const [leads, activities] = await Promise.all([
-        dbService.getAllLeads(),
-        dbService.getAllActivities()
-      ]);
-
-      this.setDataset(leads, activities);
-      return;
-    }
-
-    // Browser refresh:
-    // Explicitly reread Google Sheets so the CRM stays up to date.
-    const { leads, activities } = await dbService.refreshFromSheets();
+    // The backend already keeps Google Sheets loaded in its in-memory cache.
+    // Always read from that cache on load (fast, no Sheets round-trip).
+    // A fresh Sheets read only happens when the user explicitly clicks Refresh.
+    const [leads, activities] = await Promise.all([
+      dbService.getAllLeads(),
+      dbService.getAllActivities()
+    ]);
 
     this.setDataset(leads, activities);
   }
@@ -133,7 +120,7 @@ class App {
 
   populateDropdowns() {
     // 1. Statuses
-    const statusSelects = ['filter-status', 'add-status', 'edit-status'];
+    const statusSelects = ['filter-status', 'edit-status'];
     statusSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -148,7 +135,7 @@ class App {
     });
 
     // 2. Sources
-    const sourceSelects = ['filter-source', 'add-lead-source', 'edit-lead-source'];
+    const sourceSelects = ['filter-source', 'edit-lead-source'];
     sourceSelects.forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -197,7 +184,7 @@ class App {
     localStorage.setItem(CONFIG.STORAGE_KEYS.ACTIVE_VIEW, viewName);
 
     // Hide all views
-    ['dashboard', 'leads', 'followups', 'settings'].forEach(v => {
+    ['dashboard', 'leads', 'followups'].forEach(v => {
       const el = document.getElementById(`view-${v}`);
       if (el) el.classList.add('hidden');
     });
@@ -207,7 +194,7 @@ class App {
     if (targetEl) targetEl.classList.remove('hidden');
 
     // Update Sidebar Navigation state
-    ['dashboard', 'leads', 'followups', 'settings'].forEach(navKey => {
+    ['dashboard', 'leads', 'followups'].forEach(navKey => {
       const navBtn = document.getElementById(`nav-${navKey}`);
       if (!navBtn) return;
       if (navKey === viewName) {
@@ -227,7 +214,6 @@ class App {
     if (viewName === 'dashboard') this.renderDashboard();
     else if (viewName === 'leads') this.renderLeadsTable();
     else if (viewName === 'followups') this.renderFollowups();
-    else if (viewName === 'settings') this.renderSettings();
   }
 
   /* -------------------------------------------------------------------------- */
@@ -250,22 +236,10 @@ class App {
     }
   }
 
-  async refreshData() {
-    try {
-      const [allLeads, allActivities] = await Promise.all([
-        dbService.getAllLeads(),
-        dbService.getAllActivities()
-      ]);
-      this.setDataset(allLeads, allActivities);
-    } catch (err) {
-      console.error('Error loading CRM data:', err);
-      this.showToast(this.friendlyConnectionError(err), 'error');
-    }
-  }
-
   setDataset(allLeads, allActivities) {
     this.allLeadsRaw = allLeads || [];
     this.activities = allActivities || [];
+    this.isInitialDataLoading = false;
     this.rebuildVisibleState();
   }
 
@@ -307,7 +281,6 @@ class App {
     if (this.currentView === 'dashboard') this.renderDashboard();
     else if (this.currentView === 'leads') this.renderLeadsTable();
     else if (this.currentView === 'followups') this.renderFollowups();
-    else if (this.currentView === 'settings') this.renderSettings();
   }
 
   updateSheetsStatus(health) {
@@ -315,33 +288,42 @@ class App {
     const status = this.sheetsHealth.status;
     const labelEl = document.getElementById('sheets-status-label');
     const dotEl = document.getElementById('sheets-status-dot');
-    const settingsEl = document.getElementById('settings-sheets-status');
 
     let label = 'Connecting...';
     let dotClass = 'bg-amber-400';
-    let settingsLabel = 'Connecting...';
-    let settingsClass = 'bg-amber-100 text-amber-800';
 
     if (status === 'ready') {
       label = 'Connected';
       dotClass = 'bg-emerald-500';
-      settingsLabel = 'Connected';
-      settingsClass = 'bg-emerald-100 text-emerald-800';
     } else if (status === 'error') {
       label = 'Connection Error';
       dotClass = 'bg-red-500';
-      settingsLabel = 'Connection Error';
-      settingsClass = 'bg-red-100 text-red-800';
     }
 
     if (labelEl) labelEl.textContent = label;
     if (dotEl) {
       dotEl.className = `w-2 h-2 rounded-full ${dotClass}`;
     }
-    if (settingsEl) {
-      settingsEl.textContent = settingsLabel;
-      settingsEl.className = `text-xs px-2.5 py-1 rounded-full font-semibold ${settingsClass}`;
-    }
+  }
+
+  getTodayRange() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const end = start + (24 * 60 * 60 * 1000) - 1;
+    return { start, end };
+  }
+
+  // Leads that had an actual outreach touchpoint (any activity) logged today,
+  // in the user's local timezone. Used by the "Today" filter and dashboard
+  // metrics. Deliberately based on activities, not lead creation date.
+  getLeadIdsReachedToday() {
+    const { start, end } = this.getTodayRange();
+    const ids = new Set();
+    this.activities.forEach(act => {
+      const t = act.activity_at ? new Date(act.activity_at).getTime() : NaN;
+      if (!isNaN(t) && t >= start && t <= end) ids.add(act.lead_id);
+    });
+    return ids;
   }
 
   updateNicheFilterOptions() {
@@ -365,9 +347,54 @@ class App {
   /* -------------------------------------------------------------------------- */
 
   renderDashboard() {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
+    // Keep the instant dashboard from showing misleading zero values
+    // while Google Sheets is still loading the first dataset.
+    if (this.isInitialDataLoading) {
+      const loadingMetrics = [
+        'metric-total-leads',
+        'metric-reached-today',
+        'metric-total-touchpoints',
+        'metric-not-contacted',
+        'metric-dm-sent',
+        'metric-replied',
+        'metric-overdue',
+        'metric-due-today',
+        'metric-calls-booked',
+        'metric-won'
+      ];
+
+      loadingMetrics.forEach(id => {
+        this.setElemText(id, '—');
+      });
+
+      const urgentContainer = document.getElementById('dashboard-urgent-followups');
+      if (urgentContainer) {
+        urgentContainer.innerHTML = `
+          <div class="py-8 text-center">
+            <div class="w-8 h-8 mx-auto mb-3 border-2 border-neutral-200 border-t-brand-600 rounded-full animate-spin"></div>
+            <p class="text-sm font-medium text-neutral-600">Loading your outreach data...</p>
+            <p class="text-xs text-neutral-400 mt-1">Connecting to Google Sheets.</p>
+          </div>
+        `;
+      }
+
+      const activityContainer = document.getElementById('dashboard-recent-activity');
+      if (activityContainer) {
+        activityContainer.innerHTML = `
+          <div class="py-8 text-center">
+            <div class="w-8 h-8 mx-auto mb-3 border-2 border-neutral-200 border-t-brand-600 rounded-full animate-spin"></div>
+            <p class="text-sm font-medium text-neutral-600">Loading recent activity...</p>
+          </div>
+        `;
+      }
+
+      const trendContainer = document.getElementById('dashboard-activity-trend');
+      if (trendContainer) trendContainer.innerHTML = '';
+
+      return;
+    }
+
+    const { start: todayStart, end: todayEnd } = this.getTodayRange();
 
     let countTotal = this.leads.length;
     let countNotContacted = 0;
@@ -404,8 +431,15 @@ class App {
       }
     });
 
+    // Reached today: leads with an actual outreach activity logged today
+    // (not leads created today).
+    const reachedTodayIds = this.getLeadIdsReachedToday();
+    const reachedTodayCount = this.leads.filter(l => reachedTodayIds.has(l.lead_id)).length;
+
     // Update DOM Metrics
     this.setElemText('metric-total-leads', countTotal);
+    this.setElemText('metric-reached-today', reachedTodayCount);
+    this.setElemText('metric-total-touchpoints', this.activities.length);
     this.setElemText('metric-not-contacted', countNotContacted);
     this.setElemText('metric-dm-sent', countDmSent);
     this.setElemText('metric-replied', countReplied);
@@ -413,6 +447,8 @@ class App {
     this.setElemText('metric-due-today', dueTodayFollowups.length);
     this.setElemText('metric-calls-booked', countCallsBooked);
     this.setElemText('metric-won', countWon);
+
+    this.renderActivityTrend();
 
     // Sidebar overdue badge
     const navOverdue = document.getElementById('nav-overdue-count');
@@ -496,6 +532,47 @@ class App {
     }
   }
 
+  // Simple 7-day outreach volume trend (today + previous 6 days), built from
+  // the activities already in memory - no extra requests.
+  renderActivityTrend() {
+    const container = document.getElementById('dashboard-activity-trend');
+    if (!container) return;
+
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      const dayEnd = dayStart + (24 * 60 * 60 * 1000) - 1;
+      days.push({ dayStart, dayEnd, label: d.toLocaleDateString(undefined, { weekday: 'short' }), count: 0 });
+    }
+
+    this.activities.forEach(act => {
+      const t = act.activity_at ? new Date(act.activity_at).getTime() : NaN;
+      if (isNaN(t)) return;
+      const day = days.find(d => t >= d.dayStart && t <= d.dayEnd);
+      if (day) day.count++;
+    });
+
+    const maxCount = Math.max(1, ...days.map(d => d.count));
+
+    container.innerHTML = `
+      <div class="flex items-end justify-between gap-2 h-24 px-1">
+        ${days.map((d, idx) => {
+          const heightPct = Math.max(6, Math.round((d.count / maxCount) * 100));
+          const isToday = idx === days.length - 1;
+          return `
+            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5" title="${d.count} touchpoint${d.count === 1 ? '' : 's'}">
+              <span class="text-[10px] font-semibold text-neutral-500">${d.count}</span>
+              <div class="w-full rounded-t-md ${isToday ? 'bg-brand-600' : 'bg-brand-200'} transition-all" style="height: ${heightPct}%"></div>
+              <span class="text-[10px] font-medium ${isToday ? 'text-brand-700' : 'text-neutral-400'}">${d.label}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   /* -------------------------------------------------------------------------- */
   /*                                LEADS VIEW                                  */
   /* -------------------------------------------------------------------------- */
@@ -514,6 +591,28 @@ class App {
     this.renderLeadsTable();
   }
 
+  // Toggle the "Today" quick filter (leads reached via an outreach
+  // activity today). Can be called from the leads view chip or from
+  // the dashboard "Reached Today" metric.
+  toggleTodayFilter(forceOn) {
+    this.filters.today = typeof forceOn === 'boolean' ? forceOn : !this.filters.today;
+    const chip = document.getElementById('filter-today-chip');
+    if (chip) {
+      chip.classList.toggle('bg-brand-600', this.filters.today);
+      chip.classList.toggle('text-white', this.filters.today);
+      chip.classList.toggle('border-brand-600', this.filters.today);
+      chip.classList.toggle('bg-white', !this.filters.today);
+      chip.classList.toggle('text-neutral-700', !this.filters.today);
+      chip.classList.toggle('border-neutral-300', !this.filters.today);
+    }
+    this.renderLeadsTable();
+  }
+
+  goToReachedToday() {
+    this.switchView('leads');
+    this.toggleTodayFilter(true);
+  }
+
   clearFilters() {
     this.searchQuery = '';
     const searchInput = document.getElementById('leads-search');
@@ -524,16 +623,22 @@ class App {
       if (el) el.value = '';
     });
 
-    this.filters = { status: '', niche: '', tier: '', source: '', followup: '' };
+    this.filters = { status: '', niche: '', tier: '', source: '', followup: '', today: false };
+    const chip = document.getElementById('filter-today-chip');
+    if (chip) {
+      chip.classList.remove('bg-brand-600', 'text-white', 'border-brand-600');
+      chip.classList.add('bg-white', 'text-neutral-700', 'border-neutral-300');
+    }
     this.renderLeadsTable();
   }
 
   getFilteredLeads() {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const todayEnd = todayStart + (24 * 60 * 60 * 1000) - 1;
+    const { start: todayStart, end: todayEnd } = this.getTodayRange();
+    const reachedTodayIds = this.filters.today ? this.getLeadIdsReachedToday() : null;
 
     return this.leads.filter(lead => {
+      if (reachedTodayIds && !reachedTodayIds.has(lead.lead_id)) return false;
+
       if (this.searchQuery) {
         const haystack = [
           lead.business_name,
@@ -576,7 +681,9 @@ class App {
     const filtered = this.getFilteredLeads();
 
     if (summaryEl) {
-      summaryEl.textContent = `Showing ${filtered.length} of ${this.leads.length} leads`;
+      summaryEl.textContent = this.filters.today
+        ? `${filtered.length} lead${filtered.length === 1 ? '' : 's'} reached today (of ${this.leads.length} total)`
+        : `Showing ${filtered.length} of ${this.leads.length} leads`;
     }
 
     if (filtered.length === 0) {
@@ -589,13 +696,8 @@ class App {
               </div>
               <h4 class="text-base font-bold text-neutral-900">Your lead list is currently empty</h4>
               <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-  Add leads directly to Google Sheets, then refresh the CRM.
-</p>
-              <div class="flex items-center justify-center gap-3 mt-4">
-                <button onclick="app.switchView('settings')" class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
-                  Import CSV / JSON
-                </button>
-              </div>
+                Add leads directly to Google Sheets, then refresh the CRM.
+              </p>
             </td>
           </tr>
         `;
@@ -948,51 +1050,6 @@ class App {
     this.activeLead = lead;
     this.openSetFollowupModal();
   }
-
-  /* -------------------------------------------------------------------------- */
-  /*                               SETTINGS VIEW                                */
-  /* -------------------------------------------------------------------------- */
-
-  renderSettings() {
-    this.setElemText('settings-total-leads', this.allLeadsRaw.length);
-    this.setElemText('settings-active-leads', this.leads.length);
-    this.setElemText('settings-total-activities', this.activities.length);
-  }
-
-  async exportCsvLeads() {
-    try {
-      this.showToast('Generating CSV file...', 'info');
-      await backupService.exportToCsv();
-      this.showToast('Leads CSV downloaded successfully', 'success');
-    } catch (e) {
-      this.showToast('Export CSV failed: ' + e.message, 'error');
-    }
-  }
-
-  async handleImportFile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      this.showToast(`Importing ${file.name}...`, 'info');
-      const ext = file.name.split('.').pop().toLowerCase();
-
-      if (ext === 'csv') {
-        const res = await backupService.importFromCsvFile(file);
-        this.showToast(`Imported ${res.importedCount} leads (${res.skippedCount} skipped/duplicates)!`, 'success');
-      } else {
-        throw new Error('Unsupported file extension. Please select a .csv file.');
-      }
-
-      await this.refreshData();
-      event.target.value = '';
-    } catch (e) {
-      console.error('Import failed:', e);
-      this.showToast('Import failed: ' + e.message, 'error');
-      event.target.value = '';
-    }
-  }
-
   /* -------------------------------------------------------------------------- */
   /*                              MODAL OPERATIONS                              */
   /* -------------------------------------------------------------------------- */
@@ -1276,6 +1333,8 @@ class App {
       iconSvg = '<svg class="w-4 h-4 text-emerald-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
     } else if (type === 'error') {
       iconSvg = '<svg class="w-4 h-4 text-red-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+    } else if (type === 'warning') {
+      iconSvg = '<svg class="w-4 h-4 text-amber-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>';
     } else {
       iconSvg = '<svg class="w-4 h-4 text-neutral-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
     }

@@ -103,22 +103,6 @@ class APIService {
     return this._mapBackendLeadToFrontend(lead);
   }
 
-  async createLead(leadData, existingLeads = []) {
-    // Perform duplicate check on frontend side before submitting
-    const dupCheck = this.findDuplicate(leadData, existingLeads);
-    if (dupCheck.duplicate) {
-      throw new Error(dupCheck.reason);
-    }
-
-    const payload = this._mapFrontendLeadToBackend(leadData);
-    const created = await this._fetch('/leads', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    return this._mapBackendLeadToFrontend(created);
-  }
-
   async updateLead(leadId, updatedFields, existingLeads = []) {
     // We need the existing lead for duplicate checks
     let existing = existingLeads.find(l => l.lead_id === leadId);
@@ -149,11 +133,6 @@ class APIService {
 
   async archiveLead(leadId) {
     return this.updateLead(leadId, { archived_at: new Date().toISOString() });
-  }
-
-  async deleteLeadPermanently(leadId) {
-    await this._fetch(`/leads/${leadId}`, { method: 'DELETE' });
-    return { success: true };
   }
 
   /* -------------------------------------------------------------------------- */
@@ -198,18 +177,6 @@ class APIService {
     }
 
     return { success: true, activity: frontendActivity, updatedLead };
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                         BULK DATA & CLEAR OPERATIONS                       */
-  /* -------------------------------------------------------------------------- */
-
-  async bulkSave(leadsArray = [], activitiesArray = []) {
-    throw new Error('Bulk import is not supported in the remote API mode.');
-  }
-
-  async clearAllData() {
-    throw new Error('Clear all data is disabled for the remote database to prevent accidental data loss.');
   }
 
   /* -------------------------------------------------------------------------- */

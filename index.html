@@ -118,16 +118,6 @@
             <span id="nav-overdue-count"
               class="hidden text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">0</span>
           </button>
-
-          <button id="nav-settings" onclick="app.switchView('settings')"
-            class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
-            <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>Settings</span>
-          </button>
         </nav>
       </div>
 
@@ -165,13 +155,6 @@
         </svg>
         <span>Follow-ups</span>
       </button>
-      <button onclick="app.switchView('settings')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        </svg>
-        <span>Settings</span>
-      </button>
     </div>
 
     <!-- ==================================================================== -->
@@ -202,10 +185,19 @@
         </div>
 
         <!-- Primary Metrics Grid -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
           <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
             <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Leads</span>
             <span id="metric-total-leads" class="text-xl font-bold text-neutral-900">0</span>
+          </div>
+          <div onclick="app.goToReachedToday()" title="View leads reached today"
+            class="metric-card-clickable bg-white p-3.5 rounded-xl border border-brand-200 bg-brand-50/20 shadow-sm cursor-pointer">
+            <span class="text-[11px] font-semibold text-brand-700 uppercase tracking-wider block mb-1">Reached Today</span>
+            <span id="metric-reached-today" class="text-xl font-bold text-brand-700">0</span>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Touchpoints</span>
+            <span id="metric-total-touchpoints" class="text-xl font-bold text-neutral-900">0</span>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
             <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Not Contacted</span>
@@ -219,11 +211,13 @@
             <span class="text-[11px] font-semibold text-blue-700 uppercase tracking-wider block mb-1">Replied</span>
             <span id="metric-replied" class="text-xl font-bold text-blue-700">0</span>
           </div>
-          <div class="bg-white p-3.5 rounded-xl border border-red-200 bg-red-50/20 shadow-sm">
+          <div onclick="app.switchView('followups')" title="View overdue follow-ups"
+            class="metric-card-clickable bg-white p-3.5 rounded-xl border border-red-200 bg-red-50/20 shadow-sm cursor-pointer">
             <span class="text-[11px] font-semibold text-red-600 uppercase tracking-wider block mb-1">Overdue</span>
             <span id="metric-overdue" class="text-xl font-bold text-red-600">0</span>
           </div>
-          <div class="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-sm">
+          <div onclick="app.switchView('followups')" title="View follow-ups due today"
+            class="metric-card-clickable bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-sm cursor-pointer">
             <span class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block mb-1">Due Today</span>
             <span id="metric-due-today" class="text-xl font-bold text-amber-700">0</span>
           </div>
@@ -235,6 +229,12 @@
             <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-1">Won</span>
             <span id="metric-won" class="text-xl font-bold text-emerald-800">0</span>
           </div>
+        </div>
+
+        <!-- Outreach Activity Trend -->
+        <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-neutral-900 mb-3">Outreach Activity &mdash; Last 7 Days</h3>
+          <div id="dashboard-activity-trend"></div>
         </div>
 
         <!-- Actionable Follow-ups & Activity Split -->
@@ -301,7 +301,7 @@
           </div>
 
           <!-- Filters Row -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
             <!-- Status Filter -->
             <select id="filter-status" onchange="app.handleFilterChange()"
               class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
@@ -338,6 +338,12 @@
               <option value="upcoming">Upcoming</option>
               <option value="none">No Follow-up</option>
             </select>
+
+            <!-- Today Quick Filter -->
+            <button id="filter-today-chip" onclick="app.toggleTodayFilter()" title="Show only leads reached today"
+              class="text-xs font-semibold border rounded-md px-3 py-1.5 bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 transition-colors">
+              &#9679; Today
+            </button>
 
             <!-- Clear Filters Button -->
             <button onclick="app.clearFilters()"
@@ -448,106 +454,6 @@
 
         </div>
       </section>
-
-      <!-- ================================================================== -->
-      <!--                            SETTINGS VIEW                           -->
-      <!-- ================================================================== -->
-      <section id="view-settings" class="hidden p-6 md:p-8 space-y-6 max-w-4xl mx-auto w-full">
-        <div>
-          <h2 class="text-2xl font-bold text-neutral-900">Settings & Data Management</h2>
-          <p class="text-sm text-neutral-500">Manage Google Sheets backups and import/export operations.</p>
-        </div>
-
-        <div class="space-y-6">
-          <!-- Local Database Status Card -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="text-base font-semibold text-neutral-900">CRM Database</h3>
-                <p class="text-xs text-neutral-500">Your CRM data is stored in Google Sheets through the local Node.js backend.</p>
-              </div>
-              <span id="settings-sheets-status" class="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold">Connecting...</span>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-200 text-xs">
-              <div>
-                <span class="text-neutral-500 block">Total Leads</span>
-                <span id="settings-total-leads" class="font-bold text-neutral-900 text-sm">0</span>
-              </div>
-              <div>
-                <span class="text-neutral-500 block">Active Prospects</span>
-                <span id="settings-active-leads" class="font-bold text-neutral-900 text-sm">0</span>
-              </div>
-              <div>
-                <span class="text-neutral-500 block">Touchpoints Logged</span>
-                <span id="settings-total-activities" class="font-bold text-neutral-900 text-sm">0</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Backup & Data Export Card -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-4">
-            <div>
-              <h3 class="text-base font-semibold text-neutral-900">Data Export</h3>
-              <p class="text-xs text-neutral-500">Export your CRM leads as a CSV.</p>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-3">
-              <button onclick="app.exportCsvLeads()"
-                class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Export Leads (CSV)</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Import Data Card -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6 space-y-4">
-            <div>
-              <h3 class="text-base font-semibold text-neutral-900">Import Data</h3>
-              <p class="text-xs text-neutral-500">Import leads from a CSV spreadsheet.</p>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <input type="file" id="input-import-file" accept=".csv" class="hidden" onchange="app.handleImportFile(event)">
-              <button onclick="document.getElementById('input-import-file').click()"
-                class="px-4 py-2 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                <span>Select CSV File to Import</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- System Info -->
-          <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold text-neutral-900 mb-3">System Information</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div>
-                <span class="text-neutral-500 block">Application</span>
-                <span class="font-medium text-neutral-900">ScaleWithLakshya CRM</span>
-              </div>
-              <div>
-                <span class="text-neutral-500 block">App Version</span>
-                <span class="font-medium text-neutral-900">3.0.0 (Fast Edition)</span>
-              </div>
-              <div>
-                <span class="text-neutral-500 block">Architecture</span>
-                <span class="font-medium text-neutral-900">Personal Single-User</span>
-              </div>
-              <div>
-                <span class="text-neutral-500 block">Storage</span>
-                <span class="font-medium text-neutral-900">Google Sheets CRM Backend</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
     </main>
 
     <!-- ==================================================================== -->
@@ -932,7 +838,6 @@
   <!-- Application Scripts -->
   <script src="config.js"></script>
   <script src="api.js"></script>
-  <script src="backup.js"></script>
   <script src="app.js"></script>
 </body>
 
