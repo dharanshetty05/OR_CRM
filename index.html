@@ -231,6 +231,17 @@
           </div>
         </div>
 
+        <!-- Daily Outreach Progress -->
+        <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-neutral-900">Today's Progress</h3>
+            <span id="daily-progress-label" class="text-xs font-semibold text-neutral-600">— / 20 reached today</span>
+          </div>
+          <div class="w-full h-2.5 bg-neutral-100 rounded-full overflow-hidden">
+            <div id="daily-progress-bar-fill" class="h-full bg-brand-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
         <!-- Outreach Activity Trend -->
         <div class="bg-white rounded-xl border border-neutral-200 shadow-sm p-5">
           <h3 class="text-sm font-semibold text-neutral-900 mb-3">Outreach Activity &mdash; Last 7 Days</h3>
@@ -240,12 +251,12 @@
         <!-- Actionable Follow-ups & Activity Split -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <!-- Overdue & Due Today Action Center -->
+          <!-- Work Queue: who to contact next -->
           <div class="bg-white rounded-xl border border-neutral-200 shadow-sm flex flex-col">
             <div class="p-5 border-b border-neutral-200 flex items-center justify-between">
               <div>
-                <h3 class="text-base font-semibold text-neutral-900">Today's Outreach & Follow-ups</h3>
-                <p class="text-xs text-neutral-500">Prospects requiring outreach or follow-up today.</p>
+                <h3 class="text-base font-semibold text-neutral-900">Work Queue &mdash; Who's Next</h3>
+                <p class="text-xs text-neutral-500">Overdue and due-today follow-ups, then leads not yet contacted.</p>
               </div>
               <button onclick="app.switchView('followups')"
                 class="text-xs font-semibold text-brand-600 hover:text-brand-700">View All &rarr;</button>
@@ -295,7 +306,7 @@
               </svg>
             </div>
             <input type="text" id="leads-search"
-              placeholder="Search leads by business, contact, niche, location, instagram, website, phone..."
+              placeholder="Search leads by business, contact, niche, location, instagram, website..."
               class="w-full pl-10 pr-4 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
               oninput="app.handleSearchChange(this.value)">
           </div>
@@ -312,15 +323,6 @@
             <select id="filter-niche" onchange="app.handleFilterChange()"
               class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Niches</option>
-            </select>
-
-            <!-- Tier Filter -->
-            <select id="filter-tier" onchange="app.handleFilterChange()"
-              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
-              <option value="">All Tiers</option>
-              <option value="A">Tier A</option>
-              <option value="B">Tier B</option>
-              <option value="C">Tier C</option>
             </select>
 
             <!-- Lead Source Filter -->
@@ -364,7 +366,6 @@
                   <th scope="col" class="px-4 py-3.5">Niche</th>
                   <th scope="col" class="px-4 py-3.5">Instagram / Outreach</th>
                   <th scope="col" class="px-4 py-3.5">Status</th>
-                  <th scope="col" class="px-3 py-3.5 text-center">Tier</th>
                   <th scope="col" class="px-4 py-3.5">Next Follow-up</th>
                   <th scope="col" class="px-4 py-3.5">Last Contacted</th>
                 </tr>
@@ -473,7 +474,6 @@
             <div>
               <div class="flex items-center gap-2 mb-1">
                 <span id="drawer-status-badge" class="badge-status">Status</span>
-                <span id="drawer-tier-badge" class="tier-badge">A</span>
                 <span id="drawer-lead-id" class="text-[11px] font-mono text-neutral-400">lead_id</span>
               </div>
               <h3 id="drawer-business-name" class="text-xl font-bold text-neutral-900">Business Name</h3>
@@ -522,22 +522,6 @@
                 </svg>
                 <span>Set Follow-up</span>
               </button>
-              <button onclick="app.openEditLeadModal()"
-                class="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
-                <svg class="w-3.5 h-3.5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span>Edit Lead</span>
-              </button>
-              <button onclick="app.handleArchiveLead()"
-                class="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition-colors ml-auto">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span>Archive</span>
-              </button>
             </div>
 
             <!-- Follow-up & Touchpoint Status Banner -->
@@ -565,14 +549,6 @@
                   <span id="drawer-niche" class="font-medium text-neutral-900">-</span>
                 </div>
                 <div>
-                  <span class="text-neutral-500 block">Email</span>
-                  <a id="drawer-email-link" href="#" class="font-medium text-brand-600 hover:underline block truncate">-</a>
-                </div>
-                <div>
-                  <span class="text-neutral-500 block">Phone</span>
-                  <a id="drawer-phone-link" href="#" class="font-medium text-neutral-900 hover:underline block">-</a>
-                </div>
-                <div>
                   <span class="text-neutral-500 block">Website</span>
                   <a id="drawer-website-link" href="#" target="_blank" rel="noopener noreferrer"
                     class="font-medium text-brand-600 hover:underline block truncate">-</a>
@@ -581,10 +557,6 @@
                   <span class="text-neutral-500 block">Instagram</span>
                   <a id="drawer-instagram-link" href="#" target="_blank" rel="noopener noreferrer"
                     class="font-medium text-brand-600 hover:underline block truncate">-</a>
-                </div>
-                <div>
-                  <span class="text-neutral-500 block">Lead Source</span>
-                  <span id="drawer-lead-source" class="font-medium text-neutral-900">-</span>
                 </div>
               </div>
             </div>
@@ -617,107 +589,6 @@
     <!-- ==================================================================== -->
     <!--                               MODALS                                 -->
     <!-- ==================================================================== -->
-
-    <!-- Modal: Edit Lead -->
-    <dialog id="modal-edit-lead" class="rounded-xl p-0 w-full max-w-2xl bg-white shadow-2xl border border-neutral-200">
-      <form method="dialog" onsubmit="app.submitEditLead(event)" class="flex flex-col max-h-[90vh]">
-        <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
-          <div>
-            <h3 class="text-lg font-bold text-neutral-900">Edit Lead</h3>
-            <p class="text-xs text-neutral-500">Update prospect details.</p>
-          </div>
-          <button type="button" onclick="document.getElementById('modal-edit-lead').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="p-6 overflow-y-auto space-y-4 text-sm">
-          <input type="hidden" id="edit-lead-id">
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label for="edit-business-name" class="block text-xs font-semibold text-neutral-700 mb-1">Business Name *</label>
-              <input type="text" id="edit-business-name" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-contact-name" class="block text-xs font-semibold text-neutral-700 mb-1">Contact Name</label>
-              <input type="text" id="edit-contact-name"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-niche" class="block text-xs font-semibold text-neutral-700 mb-1">Niche *</label>
-              <input type="text" id="edit-niche" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-location" class="block text-xs font-semibold text-neutral-700 mb-1">Location *</label>
-              <input type="text" id="edit-location" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-instagram" class="block text-xs font-semibold text-neutral-700 mb-1">Instagram Handle</label>
-              <input type="text" id="edit-instagram"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-website" class="block text-xs font-semibold text-neutral-700 mb-1">Website</label>
-              <input type="text" id="edit-website"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-phone" class="block text-xs font-semibold text-neutral-700 mb-1">Phone</label>
-              <input type="tel" id="edit-phone"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-            </div>
-            <div>
-              <label for="edit-status" class="block text-xs font-semibold text-neutral-700 mb-1">Status *</label>
-              <select id="edit-status" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Populated dynamically -->
-              </select>
-            </div>
-            <div>
-              <label for="edit-lead-tier" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Tier</label>
-              <select id="edit-lead-tier"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <option value="A">Tier A</option>
-                <option value="B">Tier B</option>
-                <option value="C">Tier C</option>
-              </select>
-            </div>
-            <div>
-              <label for="edit-lead-source" class="block text-xs font-semibold text-neutral-700 mb-1">Lead Source</label>
-              <select id="edit-lead-source"
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Populated dynamically -->
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label for="edit-next-followup" class="block text-xs font-semibold text-neutral-700 mb-1">Next Follow-up Date & Time</label>
-            <input type="datetime-local" id="edit-next-followup"
-              class="w-full sm:w-1/2 px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
-          </div>
-
-          <div>
-            <label for="edit-notes" class="block text-xs font-semibold text-neutral-700 mb-1">Notes & Angle</label>
-            <textarea id="edit-notes" rows="3"
-              class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-xs"></textarea>
-          </div>
-        </div>
-
-        <div class="p-5 border-t border-neutral-200 flex items-center justify-end gap-3 bg-neutral-50/50">
-          <button type="button" onclick="document.getElementById('modal-edit-lead').close()"
-            class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
-          <button type="submit" id="btn-submit-edit-lead"
-            class="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Save Changes</button>
-        </div>
-      </form>
-    </dialog>
 
     <!-- Modal: Add Activity -->
     <dialog id="modal-add-activity" class="rounded-xl p-0 w-full max-w-lg bg-white shadow-2xl border border-neutral-200">

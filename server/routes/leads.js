@@ -11,7 +11,7 @@ let maxRow = 1;
 
 async function reloadFromSheets() {
     console.log('Loading Leads cache from Google Sheets...');
-    const rows = await getRows(`${SHEET_NAME}!A2:U`);
+    const rows = await getRows(`${SHEET_NAME}!A2:Q`);
     
     leadsCache = [];
     leadRowMap.clear();
@@ -40,25 +40,21 @@ function mapRowToLead(row) {
     return {
         id: row[0] || '',
         business_name: row[1] || '',
-        contact_name: row[2] || '',
+        location: row[2] || '',
         niche: row[3] || '',
-        location: row[4] || '',
+        instagram_url: row[4] || '',
         website: row[5] || '',
-        instagram: row[6] || '',
-        email: row[7] || '',
-        phone: row[8] || '',
-        status: row[9] || '',
-        lead_tier: row[10] || '',
-        lead_source: row[11] || '',
-        google_place_id: row[12] || '',
-        lead_score: row[13] || '',
-        opportunity_score: row[14] || '',
-        notes: row[15] || '',
-        created_at: row[16] || '',
-        last_contacted: row[17] || '',
-        next_followup: row[18] || '',
-        updated_at: row[19] || '',
-        archived_at: row[20] || ''
+        opportunity_score: row[6] || '',
+        status: row[7] || '',
+        next_followup: row[8] || '',
+        follow_up_count: row[9] || '',
+        last_activity: row[10] || '',
+        reply_date: row[11] || '',
+        call_booked_date: row[12] || '',
+        outcome: row[13] || '',
+        notes: row[14] || '',
+        created_at: row[15] || '',
+        updated_at: row[16] || ''
     };
 }
 
@@ -66,25 +62,21 @@ function mapLeadToRow(lead) {
     return [
         lead.id || '',
         lead.business_name || '',
-        lead.contact_name || '',
-        lead.niche || '',
         lead.location || '',
+        lead.niche || '',
+        lead.instagram_url || '',
         lead.website || '',
-        lead.instagram || '',
-        lead.email || '',
-        lead.phone || '',
-        lead.status || '',
-        lead.lead_tier || '',
-        lead.lead_source || '',
-        lead.google_place_id || '',
-        lead.lead_score || '',
         lead.opportunity_score || '',
+        lead.status || '',
+        lead.next_followup || '',
+        lead.follow_up_count || '',
+        lead.last_activity || '',
+        lead.reply_date || '',
+        lead.call_booked_date || '',
+        lead.outcome || '',
         lead.notes || '',
         lead.created_at || '',
-        lead.last_contacted || '',
-        lead.next_followup || '',
-        lead.updated_at || '',
-        lead.archived_at || ''
+        lead.updated_at || ''
     ];
 }
 
@@ -128,7 +120,7 @@ router.patch('/:id', async (req, res) => {
         const updatedLead = { ...existingLead, ...req.body, id: existingLead.id };
         const rowData = mapLeadToRow(updatedLead);
         
-        await updateRow(`${SHEET_NAME}!A${rowNumber}:U${rowNumber}`, rowData);
+        await updateRow(`${SHEET_NAME}!A${rowNumber}:Q${rowNumber}`, rowData);
         
         leadsCache[rowIndex] = updatedLead;
         res.json(updatedLead);

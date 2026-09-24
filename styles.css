@@ -102,21 +102,6 @@ dialog[open]::backdrop {
 .status-won { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; font-weight: 700; }
 .status-lost { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
-/* Tier Badges */
-.tier-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.25rem;
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-.tier-A { background-color: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
-.tier-B { background-color: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-.tier-C { background-color: #f9fafb; color: #6b7280; border: 1px solid #e5e7eb; }
-
 /* Follow-up State Tag */
 .followup-overdue {
   color: #dc2626;

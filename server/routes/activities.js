@@ -9,7 +9,7 @@ let activitiesCache = null;
 
 async function reloadFromSheets() {
     console.log('Loading Activities cache from Google Sheets...');
-    const rows = await getRows(`${SHEET_NAME}!A2:E`);
+    const rows = await getRows(`${SHEET_NAME}!A2:I`);
     activitiesCache = rows.map(mapRowToActivity).filter(a => a.id);
     console.log(`Loaded ${activitiesCache.length} activities into cache.`);
     return activitiesCache;
@@ -23,9 +23,13 @@ function mapRowToActivity(row) {
     return {
         id: row[0] || '',
         lead_id: row[1] || '',
-        date: row[2] || '',
-        type: row[3] || '',
-        note: row[4] || ''
+        type: row[2] || '',
+        date: row[3] || '',
+        follow_up_number: row[4] || '',
+        message: row[5] || '',
+        outcome: row[6] || '',
+        notes: row[7] || '',
+        created_at: row[8] || ''
     };
 }
 

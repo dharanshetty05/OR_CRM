@@ -49,15 +49,31 @@ class APIService {
   }
 
   async waitUntilReady(onStatus) {
+    // NOTE: this used to give up after ~15 attempts (~35s total). Loading a
+    // large Google Sheet (or a slow/cold network) can easily take longer
+    // than that, so the poll would abandon a load that was still legitimately
+    // in progress on the backend. The result: the dashboard would sit on a
+    // stale "Connecting..." state and only pick up the data once the user
+    // manually clicked Refresh (which re-awaits the same in-flight load on
+    // the server and succeeds). Fixing the actual cause: keep polling as
+    // long as the backend reports "starting" (never give up on a load that
+    // is still happening), and only stop early on an explicit "error" status
+    // or a genuine network failure. A very generous overall ceiling (10
+    // minutes) exists purely as a last-resort safety valve, not as the
+    // normal exit path.
     let lastError = null;
     let delayMs = 0;
+    let networkFailures = 0;
+    const startedAt = Date.now();
+    const MAX_WAIT_MS = 10 * 60 * 1000;
 
-    for (let attempt = 0; attempt < 15; attempt++) {
+    while (Date.now() - startedAt < MAX_WAIT_MS) {
       if (delayMs) {
         await new Promise(r => setTimeout(r, delayMs));
       }
       try {
         const health = await this.getHealth();
+        networkFailures = 0;
         if (typeof onStatus === 'function') onStatus(health);
         if (health.status === 'ready' && health.ready) {
           return health;
@@ -69,6 +85,14 @@ class APIService {
       } catch (e) {
         lastError = e;
         if (e.message === 'Google Sheets is unavailable') throw e;
+        // A handful of consecutive network failures (server not accepting
+        // connections yet) is expected right after the launcher starts the
+        // process - keep retrying. Only bubble up "Could not connect" if it
+        // persists well past a normal startup window.
+        if (e.message === 'Could not connect to MyCRM') {
+          networkFailures++;
+          if (networkFailures >= 40) throw e; // ~ a couple minutes of failures
+        }
       }
       delayMs = delayMs === 0 ? 400 : Math.min(3000, Math.round(delayMs * 1.5));
     }
@@ -131,10 +155,6 @@ class APIService {
     return this._mapBackendLeadToFrontend(updated);
   }
 
-  async archiveLead(leadId) {
-    return this.updateLead(leadId, { archived_at: new Date().toISOString() });
-  }
-
   /* -------------------------------------------------------------------------- */
   /*                          ACTIVITY OPERATIONS                               */
   /* -------------------------------------------------------------------------- */
@@ -185,22 +205,14 @@ class APIService {
 
   findDuplicate(newLeadData, existingLeads, excludeLeadId = null) {
     const normDomain = this.normalizeDomain(newLeadData.website);
-    const normPhone = this.normalizePhone(newLeadData.phone);
     const placeId = (newLeadData.google_place_id || '').trim();
     const bizLoc = (newLeadData.business_name || '').trim().toLowerCase() + '::' + (newLeadData.location || '').trim().toLowerCase();
 
     for (const lead of existingLeads) {
       if (excludeLeadId && lead.lead_id === excludeLeadId) continue;
-      if (lead.archived_at) continue;
 
-      if (placeId && lead.google_place_id && lead.google_place_id.trim() === placeId) {
-        return { duplicate: true, reason: `Duplicate Place ID with existing lead: "${lead.business_name}"` };
-      }
       if (normDomain && lead.normalized_domain && lead.normalized_domain === normDomain) {
         return { duplicate: true, reason: `Duplicate website domain (${normDomain}) with existing lead: "${lead.business_name}"` };
-      }
-      if (normPhone && lead.normalized_phone && lead.normalized_phone === normPhone) {
-        return { duplicate: true, reason: `Duplicate phone number (${normPhone}) with existing lead: "${lead.business_name}"` };
       }
       if (newLeadData.business_name && newLeadData.location) {
         const existingBizLoc = (lead.business_name || '').trim().toLowerCase() + '::' + (lead.location || '').trim().toLowerCase();
@@ -221,11 +233,6 @@ class APIService {
     domain = domain.replace(/[\/.]+$/, '');
     return domain;
   }
-
-  normalizePhone(phone) {
-    if (!phone || typeof phone !== 'string') return '';
-    return phone.trim().replace(/[^\d+]/g, '');
-  }
   
   _mapBackendLeadToFrontend = (b) => {
     const mapped = { ...b };
@@ -236,9 +243,7 @@ class APIService {
     if (b.next_followup) { mapped.next_follow_up_at = b.next_followup; delete mapped.next_followup; }
     
     // Auto-generate normalized fields for frontend
-    if (!mapped.normalized_domain) { mapped.normalized_domain = this.normalizeDomain(mapped.website) || ''; }
-    if (!mapped.normalized_phone) { mapped.normalized_phone = this.normalizePhone(mapped.phone) || ''; }
-    
+    if (!mapped.normalized_domain) { mapped.normalized_domain = this.normalizeDomain(mapped.website) || ''; }    
     return mapped;
   }
 

@@ -15,6 +15,10 @@ const CONFIG = {
   // Same-origin API prefix served by Express
   API_BASE_URL: '/api',
 
+  // Simple, editable daily outreach goal used by the "Today's Progress"
+  // indicator on the dashboard. Not a settings system - just a constant.
+  DAILY_OUTREACH_TARGET: 20,
+
   // Primary Outreach Statuses
   STATUSES: [
     'NOT CONTACTED',
@@ -25,14 +29,11 @@ const CONFIG = {
     'LOST'
   ],
 
-  TIERS: ['A', 'B', 'C'],
-
   ACTIVITY_TYPES: [
     'Initial DM',
     'Follow-up #1',
     'Follow-up #2',
     'Follow-up #3',
-    'Email Sent',
     'Reply Received',
     'Call Booked',
     'Call Completed',
@@ -49,7 +50,6 @@ const CONFIG = {
     'Follow-up #1',
     'Follow-up #2',
     'Follow-up #3',
-    'Email Sent',
     'Reply Received',
     'Call Booked',
     'Call Completed',
@@ -58,8 +58,6 @@ const CONFIG = {
 
   CHANNELS: [
     'Instagram',
-    'Email',
-    'Phone',
     'Website',
     'Other'
   ],
