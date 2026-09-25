@@ -1,58 +1,75 @@
-
 /**
- * ScaleWithLakshya Outreach CRM - Main Application Logic
- * Express-served frontend with Google Sheets as the source of truth.
+ * ScaleWithLakshya Outreach CRM
+ * Main Application Logic
+ *
+ * Backend source of truth:
+ *   LEADS    -> routes/leads.js
+ *   ACTIVITY -> routes/activities.js
+ *
+ * The frontend normalizes backend field names so UI logic stays consistent.
  */
 
 class App {
   constructor() {
     this.leads = [];
-    this.allLeadsRaw = [];
     this.activities = [];
     this.activeLead = null;
+
     this.isInitialDataLoading = true;
-    this.currentView = 'leads';
-    this.sheetsHealth = { status: 'starting', ready: false };
+    this.currentView = 'dashboard';
+
+    this.sheetsHealth = {
+      status: 'starting',
+      ready: false
+    };
+
     this.searchQuery = '';
 
     this.filters = {
       status: '',
       niche: '',
-      followup: '',
-      today: false
+      followup: ''
     };
 
     this.init = this.init.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                               INITIALIZATION                               */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* INITIALIZATION                                                             */
+  /* ========================================================================== */
 
   async init() {
-    console.log(`${CONFIG.APP_NAME} v${CONFIG.APP_VERSION} initializing...`);
+    console.log(
+      `${CONFIG.APP_NAME} v${CONFIG.APP_VERSION} initializing...`
+    );
 
     window.addEventListener('keydown', this.handleKeyDown);
 
-    this.populateDropdowns();
-    this.updateSheetsStatus({ status: 'starting', ready: false });
+    this.updateSheetsStatus({
+      status: 'starting',
+      ready: false
+    });
 
-    // Show dashboard immediately. Data loads in the background.
+    // Dashboard appears immediately.
     this.switchView('dashboard');
     this.hideLoadingOverlay();
 
+    // Load data in background.
     try {
       await this.connectAndLoad();
-    } catch (e) {
-      console.error('Failed to load MyCRM data:', e);
+    } catch (error) {
+      console.error('Failed to load CRM:', error);
 
       this.updateSheetsStatus({
         status: 'error',
         ready: false
       });
 
-      this.showToast(this.friendlyConnectionError(e), 'error');
+      this.showToast(
+        this.friendlyConnectionError(error),
+        'error'
+      );
     }
   }
 
@@ -66,18 +83,16 @@ class App {
       ready: true
     });
 
-    // Backend serves its in-memory cache.
-    // Google Sheets is refreshed only when the user explicitly refreshes.
-    const [leads, activities] = await Promise.all([
+    const [rawLeads, rawActivities] = await Promise.all([
       dbService.getAllLeads(),
       dbService.getAllActivities()
     ]);
 
-    this.setDataset(leads, activities);
+    this.setDataset(rawLeads, rawActivities);
   }
 
   friendlyConnectionError(error) {
-    const message = (error && error.message) || '';
+    const message = error?.message || '';
 
     if (message.includes('unavailable')) {
       return 'Google Sheets is unavailable';
@@ -87,12 +102,12 @@ class App {
       return 'Google Sheets is connecting...';
     }
 
-    if (message.includes('Could not connect')) {
-      return 'Could not connect to MyCRM';
-    }
-
     return 'Could not connect to MyCRM';
   }
+
+  /* ========================================================================== */
+  /* LOADING                                                                    */
+  /* ========================================================================== */
 
   showLoadingOverlay(
     text = 'Google Sheets is connecting...',
@@ -104,8 +119,8 @@ class App {
     const retry = document.getElementById('app-loading-retry');
 
     if (label) {
-      const textSpan = label.querySelector('span') || label;
-      textSpan.textContent = text;
+      const span = label.querySelector('span') || label;
+      span.textContent = text;
     }
 
     if (spinner) {
@@ -129,8 +144,8 @@ class App {
     }
   }
 
-  handleKeyDown(e) {
-    if (e.key !== 'Escape') return;
+  handleKeyDown(event) {
+    if (event.key !== 'Escape') return;
 
     const drawer = document.getElementById('lead-drawer');
 
@@ -139,52 +154,160 @@ class App {
     }
   }
 
-  populateDropdowns() {
-    // Status filters
-    const statusSelects = ['filter-status'];
+  /* ========================================================================== */
+  /* DATA NORMALIZATION                                                         */
+  /* ========================================================================== */
 
-    statusSelects.forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
+  normalizeLead(raw) {
+    if (!raw) return null;
 
-      el.innerHTML = '<option value="">All Statuses</option>';
+    return {
+      id: raw.lead_id || '',
+      business_name: raw.business_name || '',
+      location: raw.location || '',
+      niche: raw.niche || '',
+      instagram_url: raw.instagram_url || '',
+      website: raw.website || '',
+      opportunity_score: raw.opportunity_score ?? '',
+      status: raw.status || 'NEW_LEAD',
+      next_follow_up_at: raw.next_follow_up_at || '',
+      follow_up_count: Number(raw.follow_up_count || 0),
+      dm_sent_date_time: raw.dm_sent_date_time || '',
+      reply_date: raw.reply_date || '',
+      call_booked_date: raw.call_booked_date || '',
+      outcome: raw.outcome || '',
+      notes: raw.notes || '',
+      updated_at: raw.updated_at || ''
+    };
+  }
 
-      CONFIG.STATUSES.forEach(status => {
-        const opt = document.createElement('option');
-        opt.value = status;
-        opt.textContent = status;
-        el.appendChild(opt);
-      });
-    });
+  normalizeActivity(raw) {
+    if (!raw) return null;
 
-    // Activity types
-    const actTypeSelect = document.getElementById('act-type');
+    return {
+      id:
+        raw.id ||
+        raw.activity_id ||
+        '',
 
-    if (actTypeSelect) {
-      actTypeSelect.innerHTML = '';
+      lead_id:
+        raw.lead_id ||
+        '',
 
-      CONFIG.ACTIVITY_TYPES.forEach(type => {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = type;
-        actTypeSelect.appendChild(opt);
-      });
+      type:
+        raw.type ||
+        raw.activity_type ||
+        '',
+
+      date:
+        raw.date ||
+        raw.activity_at ||
+        '',
+
+      follow_up_number:
+        raw.follow_up_number || '',
+
+      message:
+        raw.message ||
+        raw.summary ||
+        '',
+
+      outcome:
+        raw.outcome || '',
+
+      notes:
+        raw.notes || '',
+
+      created_at:
+        raw.created_at || ''
+    };
+  }
+
+  setDataset(rawLeads, rawActivities) {
+    this.leads = (rawLeads || [])
+      .map(lead => this.normalizeLead(lead))
+      .filter(lead => lead && lead.id);
+
+    this.activities = (rawActivities || [])
+      .map(activity => this.normalizeActivity(activity))
+      .filter(activity => activity && activity.id);
+
+    this.isInitialDataLoading = false;
+
+    this.updateLeadCount();
+    this.updateNicheFilterOptions();
+    this.rerenderCurrentView();
+
+    this.refreshActiveLead();
+  }
+
+  applyLocalLead(rawLead) {
+    const lead = this.normalizeLead(rawLead);
+
+    if (!lead || !lead.id) return;
+
+    const index =
+      this.leads.findIndex(item => item.id === lead.id);
+
+    if (index === -1) {
+      this.leads.push(lead);
+    } else {
+      this.leads[index] = lead;
     }
 
-    // Channel is Instagram-only.
-    // The UI may still contain the old channel field, so support it
-    // without depending on it.
-    const actChannelSelect = document.getElementById('act-channel');
+    this.updateLeadCount();
+    this.updateNicheFilterOptions();
+    this.rerenderCurrentView();
+    this.refreshActiveLead();
+  }
 
-    if (actChannelSelect) {
-      actChannelSelect.innerHTML = '<option value="Instagram">Instagram</option>';
-      actChannelSelect.value = 'Instagram';
+  applyLocalActivity(rawActivity) {
+    const activity =
+      this.normalizeActivity(rawActivity);
+
+    if (!activity || !activity.id) return;
+
+    const index =
+      this.activities.findIndex(
+        item => item.id === activity.id
+      );
+
+    if (index === -1) {
+      this.activities.push(activity);
+    } else {
+      this.activities[index] = activity;
+    }
+
+    this.rerenderCurrentView();
+    this.refreshActiveLead();
+  }
+
+  refreshActiveLead() {
+    if (!this.activeLead) return;
+
+    const freshLead =
+      this.leads.find(
+        lead => lead.id === this.activeLead.id
+      );
+
+    if (!freshLead) return;
+
+    this.activeLead = freshLead;
+    this.renderLeadDrawerContent();
+  }
+
+  updateLeadCount() {
+    const countEl =
+      document.getElementById('nav-leads-count');
+
+    if (countEl) {
+      countEl.textContent = this.leads.length;
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                               VIEW NAVIGATION                              */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* VIEW NAVIGATION                                                             */
+  /* ========================================================================== */
 
   switchView(viewName) {
     this.currentView = viewName;
@@ -195,37 +318,40 @@ class App {
     );
 
     ['dashboard', 'leads', 'followups'].forEach(view => {
-      const el = document.getElementById(`view-${view}`);
+      const element =
+        document.getElementById(`view-${view}`);
 
-      if (el) {
-        el.classList.add('hidden');
+      if (element) {
+        element.classList.add('hidden');
       }
     });
 
-    const targetEl = document.getElementById(`view-${viewName}`);
+    const target =
+      document.getElementById(`view-${viewName}`);
 
-    if (targetEl) {
-      targetEl.classList.remove('hidden');
+    if (target) {
+      target.classList.remove('hidden');
     }
 
     ['dashboard', 'leads', 'followups'].forEach(navKey => {
-      const navBtn = document.getElementById(`nav-${navKey}`);
+      const button =
+        document.getElementById(`nav-${navKey}`);
 
-      if (!navBtn) return;
+      if (!button) return;
+
+      const icon = button.querySelector('svg');
 
       if (navKey === viewName) {
-        navBtn.classList.add(
+        button.classList.add(
           'bg-brand-50',
           'text-brand-700',
           'font-semibold'
         );
 
-        navBtn.classList.remove(
+        button.classList.remove(
           'text-neutral-700',
           'hover:bg-neutral-100'
         );
-
-        const icon = navBtn.querySelector('svg');
 
         if (icon) {
           icon.classList.replace(
@@ -234,18 +360,16 @@ class App {
           );
         }
       } else {
-        navBtn.classList.remove(
+        button.classList.remove(
           'bg-brand-50',
           'text-brand-700',
           'font-semibold'
         );
 
-        navBtn.classList.add(
+        button.classList.add(
           'text-neutral-700',
           'hover:bg-neutral-100'
         );
-
-        const icon = navBtn.querySelector('svg');
 
         if (icon) {
           icon.classList.replace(
@@ -256,18 +380,26 @@ class App {
       }
     });
 
-    if (viewName === 'dashboard') {
+    this.rerenderCurrentView();
+  }
+
+  rerenderCurrentView() {
+    if (this.currentView === 'dashboard') {
       this.renderDashboard();
-    } else if (viewName === 'leads') {
+    }
+
+    if (this.currentView === 'leads') {
       this.renderLeadsTable();
-    } else if (viewName === 'followups') {
+    }
+
+    if (this.currentView === 'followups') {
       this.renderFollowups();
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                            DATA SYNCHRONIZATION                            */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* GOOGLE SHEETS REFRESH                                                      */
+  /* ========================================================================== */
 
   async refreshFromSheets() {
     try {
@@ -276,10 +408,13 @@ class App {
         'info'
       );
 
-      const { leads, activities } =
+      const result =
         await dbService.refreshFromSheets();
 
-      this.setDataset(leads, activities);
+      this.setDataset(
+        result.leads || [],
+        result.activities || []
+      );
 
       this.updateSheetsStatus({
         status: 'ready',
@@ -287,111 +422,25 @@ class App {
       });
 
       this.showToast(
-        'Leads refreshed from Google Sheets',
+        'CRM refreshed successfully',
         'success'
       );
-    } catch (err) {
+    } catch (error) {
       console.error(
-        'Error refreshing from Google Sheets:',
-        err
+        'Error refreshing Google Sheets:',
+        error
       );
 
-      if (this.sheetsHealth.status !== 'ready') {
-        this.updateSheetsStatus({
-          status: 'error',
-          ready: false
-        });
-      }
+      this.updateSheetsStatus({
+        status: 'error',
+        ready: false
+      });
 
       this.showToast(
-        err.message || 'Google Sheets is unavailable',
+        error.message ||
+        'Google Sheets is unavailable',
         'error'
       );
-    }
-  }
-
-  setDataset(allLeads, allActivities) {
-    this.allLeadsRaw = Array.isArray(allLeads)
-      ? allLeads
-      : [];
-
-    this.activities = Array.isArray(allActivities)
-      ? allActivities
-      : [];
-
-    this.isInitialDataLoading = false;
-
-    this.rebuildVisibleState();
-  }
-
-  applyLocalLead(lead) {
-    if (!lead || !lead.lead_id) return;
-
-    const idx = this.allLeadsRaw.findIndex(
-      existing => existing.lead_id === lead.lead_id
-    );
-
-    if (idx === -1) {
-      this.allLeadsRaw.push(lead);
-    } else {
-      this.allLeadsRaw[idx] = lead;
-    }
-
-    this.rebuildVisibleState();
-  }
-
-  applyLocalActivity(activity) {
-    if (!activity) return;
-
-    const existing = this.activities.findIndex(
-      item => item.activity_id === activity.activity_id
-    );
-
-    if (existing === -1) {
-      this.activities.push(activity);
-    } else {
-      this.activities[existing] = activity;
-    }
-
-    this.rebuildVisibleState();
-  }
-
-  rebuildVisibleState() {
-    // No archive filtering.
-    // Google Sheets is the source of truth.
-    this.leads = this.allLeadsRaw.filter(
-      lead => lead && lead.lead_id
-    );
-
-    const countEl =
-      document.getElementById('nav-leads-count');
-
-    if (countEl) {
-      countEl.textContent = this.leads.length;
-    }
-
-    this.updateNicheFilterOptions();
-    this.rerenderCurrentView();
-
-    if (this.activeLead) {
-      const freshLead = this.allLeadsRaw.find(
-        lead => lead.lead_id === this.activeLead.lead_id
-      );
-
-      if (freshLead) {
-        this.activeLead = freshLead;
-        this.renderLeadDrawerContent();
-      }
-    }
-  }
-
-  rerenderCurrentView() {
-    if (this.currentView === 'dashboard') {
-      this.renderDashboard();
-    } else if (this.currentView === 'leads') {
-      this.renderLeadsTable();
-    } else if (this.currentView === 'followups') {
-      this.renderFollowups();
     }
   }
 
@@ -402,51 +451,56 @@ class App {
         ready: false
       };
 
-    const status = this.sheetsHealth.status;
+    const label =
+      document.getElementById(
+        'sheets-status-label'
+      );
 
-    const labelEl =
-      document.getElementById('sheets-status-label');
+    const dot =
+      document.getElementById(
+        'sheets-status-dot'
+      );
 
-    const dotEl =
-      document.getElementById('sheets-status-dot');
-
-    let label = 'Connecting...';
+    let labelText = 'Connecting...';
     let dotClass = 'bg-amber-400';
 
-    if (status === 'ready') {
-      label = 'Connected';
+    if (this.sheetsHealth.status === 'ready') {
+      labelText = 'Connected';
       dotClass = 'bg-emerald-500';
-    } else if (status === 'error') {
-      label = 'Connection Error';
+    }
+
+    if (this.sheetsHealth.status === 'error') {
+      labelText = 'Connection Error';
       dotClass = 'bg-red-500';
     }
 
-    if (labelEl) {
-      labelEl.textContent = label;
+    if (label) {
+      label.textContent = labelText;
     }
 
-    if (dotEl) {
-      dotEl.className =
+    if (dot) {
+      dot.className =
         `w-2 h-2 rounded-full ${dotClass}`;
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                              DATE / ACTIVITY                               */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* DATE HELPERS                                                               */
+  /* ========================================================================== */
 
   getTodayRange() {
     const now = new Date();
 
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    ).getTime();
+    const start =
+      new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate()
+      ).getTime();
 
     const end =
       start +
-      (24 * 60 * 60 * 1000) -
+      24 * 60 * 60 * 1000 -
       1;
 
     return {
@@ -455,70 +509,13 @@ class App {
     };
   }
 
-  getLeadIdsReachedToday() {
-    const { start, end } =
-      this.getTodayRange();
-
-    const ids = new Set();
-
-    this.activities.forEach(activity => {
-      const time = activity.activity_at
-        ? new Date(activity.activity_at).getTime()
-        : NaN;
-
-      if (
-        !isNaN(time) &&
-        time >= start &&
-        time <= end &&
-        activity.lead_id
-      ) {
-        ids.add(activity.lead_id);
-      }
-    });
-
-    return ids;
-  }
-
-  updateNicheFilterOptions() {
-    const nicheSelect =
-      document.getElementById('filter-niche');
-
-    if (!nicheSelect) return;
-
-    const currentValue = nicheSelect.value;
-
-    const niches = Array.from(
-      new Set(
-        this.leads
-          .map(lead => (lead.niche || '').trim())
-          .filter(Boolean)
-      )
-    ).sort();
-
-    nicheSelect.innerHTML =
-      '<option value="">All Niches</option>';
-
-    niches.forEach(niche => {
-      const opt = document.createElement('option');
-
-      opt.value = niche;
-      opt.textContent = niche;
-
-      if (niche === currentValue) {
-        opt.selected = true;
-      }
-
-      nicheSelect.appendChild(opt);
-    });
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                               DASHBOARD VIEW                               */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* DASHBOARD                                                                  */
+  /* ========================================================================== */
 
   renderDashboard() {
     if (this.isInitialDataLoading) {
-      const loadingMetrics = [
+      const metricIds = [
         'metric-total-leads',
         'metric-reached-today',
         'metric-total-touchpoints',
@@ -531,67 +528,9 @@ class App {
         'metric-won'
       ];
 
-      loadingMetrics.forEach(id => {
+      metricIds.forEach(id => {
         this.setElemText(id, '—');
       });
-
-      const urgentContainer =
-        document.getElementById(
-          'dashboard-urgent-followups'
-        );
-
-      if (urgentContainer) {
-        urgentContainer.innerHTML = `
-          <div class="py-8 text-center">
-            <div class="w-8 h-8 mx-auto mb-3 border-2 border-neutral-200 border-t-brand-600 rounded-full animate-spin"></div>
-            <p class="text-sm font-medium text-neutral-600">Loading your outreach data...</p>
-            <p class="text-xs text-neutral-400 mt-1">Connecting to Google Sheets.</p>
-          </div>
-        `;
-      }
-
-      const progressBar =
-        document.getElementById(
-          'daily-progress-bar-fill'
-        );
-
-      const progressLabel =
-        document.getElementById(
-          'daily-progress-label'
-        );
-
-      if (progressBar) {
-        progressBar.style.width = '0%';
-      }
-
-      if (progressLabel) {
-        progressLabel.textContent =
-          '— / ' +
-          (CONFIG.DAILY_OUTREACH_TARGET || 20);
-      }
-
-      const activityContainer =
-        document.getElementById(
-          'dashboard-recent-activity'
-        );
-
-      if (activityContainer) {
-        activityContainer.innerHTML = `
-          <div class="py-8 text-center">
-            <div class="w-8 h-8 mx-auto mb-3 border-2 border-neutral-200 border-t-brand-600 rounded-full animate-spin"></div>
-            <p class="text-sm font-medium text-neutral-600">Loading recent activity...</p>
-          </div>
-        `;
-      }
-
-      const trendContainer =
-        document.getElementById(
-          'dashboard-activity-trend'
-        );
-
-      if (trendContainer) {
-        trendContainer.innerHTML = '';
-      }
 
       return;
     }
@@ -601,137 +540,85 @@ class App {
       end: todayEnd
     } = this.getTodayRange();
 
-    let countTotal = this.leads.length;
-    let countNotContacted = 0;
-    let countDmSent = 0;
-    let countReplied = 0;
-    let countCallsBooked = 0;
-    let countWon = 0;
+    let notContacted = 0;
+    let dmSent = 0;
+    let replied = 0;
+    let callsBooked = 0;
+    let won = 0;
 
-    const overdueFollowups = [];
-    const dueTodayFollowups = [];
+    const overdue = [];
+    const dueToday = [];
 
     this.leads.forEach(lead => {
       const status =
         (lead.status || '').toUpperCase();
 
-      if (
-        status === 'NOT CONTACTED' ||
-        status === 'NEW' ||
-        status === 'RESEARCHING' ||
-        status === 'READY TO CONTACT'
-      ) {
-        countNotContacted++;
-      } else if (
-        status === 'DM SENT' ||
-        status === 'CONTACTED' ||
-        status === 'FOLLOW-UP'
-      ) {
-        countDmSent++;
-      } else if (status === 'REPLIED') {
-        countReplied++;
-      } else if (
-        status === 'CALL BOOKED' ||
-        status === 'CALL COMPLETED' ||
-        status === 'PROPOSAL SENT'
-      ) {
-        countCallsBooked++;
-      } else if (status === 'WON') {
-        countWon++;
+      if (status === 'NEW_LEAD') {
+        notContacted++;
+      }
+
+      if (status === 'DM_SENT') {
+        dmSent++;
+      }
+
+      if (status === 'REPLIED') {
+        replied++;
+      }
+
+      if (status === 'CALL_BOOKED') {
+        callsBooked++;
+      }
+
+      if (status === 'WON') {
+        won++;
       }
 
       if (lead.next_follow_up_at) {
-        const followupTime =
+        const time =
           new Date(
             lead.next_follow_up_at
           ).getTime();
 
-        if (!isNaN(followupTime)) {
-          if (followupTime < todayStart) {
-            overdueFollowups.push(lead);
-          } else if (
-            followupTime >= todayStart &&
-            followupTime <= todayEnd
-          ) {
-            dueTodayFollowups.push(lead);
-          }
+        if (isNaN(time)) return;
+
+        if (time < todayStart) {
+          overdue.push(lead);
+        } else if (
+          time >= todayStart &&
+          time <= todayEnd
+        ) {
+          dueToday.push(lead);
         }
       }
     });
 
-    const reachedTodayIds =
-      this.getLeadIdsReachedToday();
+    const reachedToday =
+      this.activities.filter(activity => {
+        if (!activity.date) return false;
 
-    const reachedTodayCount =
-      this.leads.filter(
-        lead =>
-          reachedTodayIds.has(lead.lead_id)
-      ).length;
-
-    const dailyTarget =
-      CONFIG.DAILY_OUTREACH_TARGET || 20;
-
-    const progressPct = Math.max(
-      0,
-      Math.min(
-        100,
-        Math.round(
-          (reachedTodayCount /
-            dailyTarget) *
-          100
-        )
-      )
-    );
-
-    const progressBar =
-      document.getElementById(
-        'daily-progress-bar-fill'
-      );
-
-    const progressLabel =
-      document.getElementById(
-        'daily-progress-label'
-      );
-
-    if (progressBar) {
-      progressBar.style.width =
-        `${progressPct}%`;
-
-      progressBar.classList.toggle(
-        'bg-emerald-500',
-        reachedTodayCount >= dailyTarget
-      );
-
-      progressBar.classList.toggle(
-        'bg-brand-600',
-        reachedTodayCount < dailyTarget
-      );
-    }
-
-    if (progressLabel) {
-      progressLabel.textContent =
-        `${reachedTodayCount} / ${dailyTarget} reached today`;
-    }
-
-    const notContactedLeads =
-      this.leads.filter(lead => {
-        const status =
-          (lead.status || '').toUpperCase();
+        const time =
+          new Date(activity.date).getTime();
 
         return (
-          (
-            status === 'NOT CONTACTED' ||
-            status === 'NEW' ||
-            status === 'RESEARCHING' ||
-            status === 'READY TO CONTACT'
-          ) &&
-          !reachedTodayIds.has(lead.lead_id)
+          !isNaN(time) &&
+          time >= todayStart &&
+          time <= todayEnd
         );
       });
 
+    const reachedTodayLeadIds =
+      new Set(
+        reachedToday.map(
+          activity => activity.lead_id
+        )
+      );
+
+    const reachedTodayCount =
+      reachedTodayLeadIds.size;
+
     this.setElemText(
       'metric-total-leads',
-      countTotal
+      this.leads.length
     );
 
     this.setElemText(
@@ -746,239 +633,332 @@ class App {
 
     this.setElemText(
       'metric-not-contacted',
-      countNotContacted
+      notContacted
     );
 
     this.setElemText(
       'metric-dm-sent',
-      countDmSent
+      dmSent
     );
 
     this.setElemText(
       'metric-replied',
-      countReplied
+      replied
     );
 
     this.setElemText(
       'metric-overdue',
-      overdueFollowups.length
+      overdue.length
     );
 
     this.setElemText(
       'metric-due-today',
-      dueTodayFollowups.length
+      dueToday.length
     );
 
     this.setElemText(
       'metric-calls-booked',
-      countCallsBooked
+      callsBooked
     );
 
     this.setElemText(
       'metric-won',
-      countWon
+      won
+    );
+
+    this.renderDailyProgress(
+      reachedTodayCount
     );
 
     this.renderActivityTrend();
 
-    const navOverdue =
+    this.renderDashboardQueue(
+      overdue,
+      dueToday
+    );
+
+    this.renderRecentActivity();
+
+    this.renderReplyRate();
+
+    const overdueBadge =
       document.getElementById(
         'nav-overdue-count'
       );
 
-    if (navOverdue) {
-      if (overdueFollowups.length > 0) {
-        navOverdue.textContent =
-          overdueFollowups.length;
+    if (overdueBadge) {
+      if (overdue.length) {
+        overdueBadge.textContent =
+          overdue.length;
 
-        navOverdue.classList.remove(
+        overdueBadge.classList.remove(
           'hidden'
         );
       } else {
-        navOverdue.classList.add(
+        overdueBadge.classList.add(
           'hidden'
         );
       }
     }
+  }
 
-    const urgentContainer =
+  renderDailyProgress(count) {
+    const target =
+      CONFIG.DAILY_OUTREACH_TARGET || 20;
+
+    const percentage =
+      Math.min(
+        100,
+        Math.round(
+          (count / target) * 100
+        )
+      );
+
+    const bar =
+      document.getElementById(
+        'daily-progress-bar-fill'
+      );
+
+    const label =
+      document.getElementById(
+        'daily-progress-label'
+      );
+
+    if (bar) {
+      bar.style.width =
+        `${percentage}%`;
+
+      bar.classList.toggle(
+        'bg-emerald-500',
+        count >= target
+      );
+
+      bar.classList.toggle(
+        'bg-brand-600',
+        count < target
+      );
+    }
+
+    if (label) {
+      label.textContent =
+        `${count} / ${target} reached today`;
+    }
+  }
+
+  renderReplyRate() {
+    const element =
+      document.getElementById(
+        'metric-reply-rate'
+      );
+
+    if (!element) return;
+
+    const contacted =
+      this.leads.filter(lead => {
+        const status =
+          (lead.status || '').toUpperCase();
+
+        return ![
+          'NEW_LEAD',
+          'NEW',
+          'RESEARCHING',
+          'READY TO CONTACT'
+        ].includes(status);
+      }).length;
+
+    const replied =
+      this.leads.filter(
+        lead =>
+          (lead.status || '').toUpperCase() ===
+          'REPLIED'
+      ).length;
+
+    const rate =
+      contacted > 0
+        ? Math.round(
+            (replied / contacted) * 100
+          )
+        : 0;
+
+    element.textContent =
+      `${rate}%`;
+  }
+
+  renderDashboardQueue(overdue, dueToday) {
+    const container =
       document.getElementById(
         'dashboard-urgent-followups'
       );
 
-    if (urgentContainer) {
-      const QUEUE_CAP = 10;
+    if (!container) return;
 
-      const queue = [
-        ...overdueFollowups.map(
-          lead => ({
-            lead,
-            reason: 'overdue'
-          })
-        ),
+    const untouched =
+      this.leads.filter(lead => {
+        const status =
+          (lead.status || '').toUpperCase();
 
-        ...dueTodayFollowups.map(
-          lead => ({
-            lead,
-            reason: 'due-today'
-          })
-        ),
+        return [
+          'NEW_LEAD',
+          'NEW',
+          'RESEARCHING',
+          'READY TO CONTACT'
+        ].includes(status);
+      });
 
-        ...notContactedLeads
-          .slice(
-            0,
-            Math.max(
-              0,
-              QUEUE_CAP -
-              overdueFollowups.length -
-              dueTodayFollowups.length
-            )
-          )
-          .map(lead => ({
-            lead,
-            reason: 'not-contacted'
-          }))
-      ];
+    const queue = [
+      ...overdue.map(lead => ({
+        lead,
+        reason: 'overdue'
+      })),
 
-      if (queue.length === 0) {
-        urgentContainer.innerHTML = `
-          <div class="py-8 text-center">
-            <div class="w-10 h-10 mx-auto mb-2 text-neutral-300">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-            </div>
-            <p class="text-sm font-medium text-neutral-700">Nothing needs action right now.</p>
-            <p class="text-xs text-neutral-400 mt-0.5">No overdue or due-today follow-ups, and every lead has been reached.</p>
-          </div>
-        `;
-      } else {
-        const reasonBadge = {
-          overdue: lead =>
-            `<span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">Overdue: ${this.formatDateTime(lead.next_follow_up_at)}</span>`,
+      ...dueToday.map(lead => ({
+        lead,
+        reason: 'today'
+      })),
 
-          'due-today': lead =>
-            `<span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">Due: ${this.formatDateTime(lead.next_follow_up_at)}</span>`,
+      ...untouched.slice(
+        0,
+        10
+      ).map(lead => ({
+        lead,
+        reason: 'new'
+      }))
+    ].slice(0, 10);
 
-          'not-contacted': () =>
-            `<span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-neutral-200">Not contacted</span>`
-        };
+    if (!queue.length) {
+      container.innerHTML = `
+        <div class="py-8 text-center">
+          <p class="text-sm font-medium text-neutral-700">
+            Nothing needs action right now.
+          </p>
+        </div>
+      `;
 
-        urgentContainer.innerHTML =
-          queue
-            .slice(0, QUEUE_CAP)
-            .map(({ lead, reason }) => `
-              <div
-                onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(lead.lead_id))}')"
-                class="py-3 px-2 flex items-center justify-between hover:bg-neutral-50 rounded-lg cursor-pointer transition-colors"
-              >
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold text-neutral-900">
-                      ${this.escapeHtml(lead.business_name)}
-                    </span>
-
-                    <span class="badge-status status-${this.slugify(lead.status)} text-[10px]">
-                      ${this.escapeHtml(lead.status)}
-                    </span>
-                  </div>
-
-                  <div class="text-xs text-neutral-500 mt-0.5 flex items-center gap-2">
-                    <span>
-                      ${this.escapeHtml(lead.instagram_url || 'Prospect')}
-                    </span>
-
-                    <span>&bull;</span>
-
-                    <span>
-                      Last touch:
-                      ${lead.last_activity
-                        ? this.formatDate(lead.last_activity)
-                        : 'Never'}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="text-right">
-                  ${reasonBadge[reason](lead)}
-                </div>
-              </div>
-            `)
-            .join('');
-      }
+      return;
     }
 
-    const activityContainer =
+    container.innerHTML =
+      queue.map(item => {
+        const lead = item.lead;
+
+        let badge = '';
+
+        if (item.reason === 'overdue') {
+          badge = `
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+              Overdue
+            </span>
+          `;
+        }
+
+        if (item.reason === 'today') {
+          badge = `
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+              Due today
+            </span>
+          `;
+        }
+
+        if (item.reason === 'new') {
+          badge = `
+            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-neutral-200">
+              Not contacted
+            </span>
+          `;
+        }
+
+        return `
+          <div
+            onclick="app.openLeadDrawer('${this.escapeJsString(lead.id)}')"
+            class="py-3 px-2 flex items-center justify-between hover:bg-neutral-50 rounded-lg cursor-pointer"
+          >
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-neutral-900">
+                  ${this.escapeHtml(lead.business_name)}
+                </span>
+
+                <span class="badge-status status-${this.slugify(lead.status)} text-[10px]">
+                  ${this.escapeHtml(lead.status)}
+                </span>
+              </div>
+
+              <div class="text-xs text-neutral-500 mt-1">
+                ${this.escapeHtml(lead.location || '-')}
+              </div>
+            </div>
+
+            ${badge}
+          </div>
+        `;
+      }).join('');
+  }
+
+  renderRecentActivity() {
+    const container =
       document.getElementById(
         'dashboard-recent-activity'
       );
 
-    if (activityContainer) {
-      if (this.activities.length === 0) {
-        activityContainer.innerHTML = `
-          <div class="py-8 text-center text-xs text-neutral-400">
-            No outreach activities recorded yet. Open any lead to log DMs.
+    if (!container) return;
+
+    const activities =
+      [...this.activities]
+        .sort(
+          (a, b) =>
+            new Date(b.date || 0) -
+            new Date(a.date || 0)
+        )
+        .slice(0, 8);
+
+    if (!activities.length) {
+      container.innerHTML = `
+        <div class="py-8 text-center text-xs text-neutral-400">
+          No outreach activity recorded yet.
+        </div>
+      `;
+
+      return;
+    }
+
+    container.innerHTML =
+      activities.map(activity => {
+        const lead =
+          this.leads.find(
+            item =>
+              item.id ===
+              activity.lead_id
+          );
+
+        return `
+          <div
+            ${lead
+              ? `onclick="app.openLeadDrawer('${this.escapeJsString(lead.id)}')"`
+              : ''}
+            class="py-2.5 px-2 hover:bg-neutral-50 rounded-lg cursor-pointer"
+          >
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-neutral-900">
+                ${this.escapeHtml(
+                  lead?.business_name || 'Lead'
+                )}
+              </span>
+
+              <span class="text-[11px] text-neutral-400">
+                ${this.formatDateTime(activity.date)}
+              </span>
+            </div>
+
+            <p class="text-xs font-medium text-neutral-700">
+              ${this.escapeHtml(activity.type)}
+            </p>
+
+            <p class="text-xs text-neutral-500 truncate mt-0.5">
+              ${this.escapeHtml(activity.message)}
+            </p>
           </div>
         `;
-      } else {
-        const sortedActivities =
-          [...this.activities]
-            .sort(
-              (a, b) =>
-                new Date(
-                  b.activity_at || 0
-                ) -
-                new Date(
-                  a.activity_at || 0
-                )
-            )
-            .slice(0, 8);
-
-        activityContainer.innerHTML =
-          sortedActivities
-            .map(activity => {
-              const relatedLead =
-                this.leads.find(
-                  lead =>
-                    lead.lead_id ===
-                    activity.lead_id
-                );
-
-              const businessName =
-                relatedLead
-                  ? relatedLead.business_name
-                  : 'Lead';
-
-              return `
-                <div
-                  ${relatedLead
-                    ? `onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(relatedLead.lead_id))}')"`
-                    : ''}
-                  class="py-2.5 px-2 hover:bg-neutral-50 rounded-lg cursor-pointer transition-colors"
-                >
-                  <div class="flex items-center justify-between text-xs mb-1">
-                    <span class="font-semibold text-neutral-900">
-                      ${this.escapeHtml(businessName)}
-                    </span>
-
-                    <span class="text-[11px] text-neutral-400">
-                      ${this.formatDateTime(activity.activity_at)}
-                    </span>
-                  </div>
-
-                  <p class="text-xs text-neutral-700 font-medium">
-                    ${this.escapeHtml(activity.activity_type)}
-                  </p>
-
-                  <p class="text-xs text-neutral-500 truncate mt-0.5">
-                    ${this.escapeHtml(activity.summary || activity.message || '')}
-                  </p>
-                </div>
-              `;
-            })
-            .join('');
-      }
-    }
+      }).join('');
   }
 
   renderActivityTrend() {
@@ -998,85 +978,93 @@ class App {
         date.getDate() - i
       );
 
-      const dayStart =
+      const start =
         new Date(
           date.getFullYear(),
           date.getMonth(),
           date.getDate()
         ).getTime();
 
-      const dayEnd =
-        dayStart +
-        (24 * 60 * 60 * 1000) -
+      const end =
+        start +
+        24 * 60 * 60 * 1000 -
         1;
 
       days.push({
-        dayStart,
-        dayEnd,
-        label: date.toLocaleDateString(
-          undefined,
-          {
-            weekday: 'short'
-          }
-        ),
+        start,
+        end,
+        label:
+          date.toLocaleDateString(
+            undefined,
+            { weekday: 'short' }
+          ),
         count: 0
       });
     }
 
     this.activities.forEach(activity => {
-      const time = activity.activity_at
-        ? new Date(
-            activity.activity_at
-          ).getTime()
-        : NaN;
+      const time =
+        new Date(
+          activity.date
+        ).getTime();
 
       if (isNaN(time)) return;
 
-      const day = days.find(
-        item =>
-          time >= item.dayStart &&
-          time <= item.dayEnd
-      );
+      const day =
+        days.find(
+          item =>
+            time >= item.start &&
+            time <= item.end
+        );
 
       if (day) {
         day.count++;
       }
     });
 
-    const maxCount = Math.max(
-      1,
-      ...days.map(day => day.count)
-    );
+    const max =
+      Math.max(
+        1,
+        ...days.map(day => day.count)
+      );
 
     container.innerHTML = `
       <div class="flex items-end justify-between gap-2 h-24 px-1">
         ${days.map((day, index) => {
-          const heightPct = Math.max(
-            6,
-            Math.round(
-              (day.count / maxCount) *
-              100
-            )
-          );
+          const height =
+            Math.max(
+              6,
+              Math.round(
+                (day.count / max) * 100
+              )
+            );
 
-          const isToday =
+          const today =
             index === days.length - 1;
 
           return `
             <div
               class="flex-1 flex flex-col items-center justify-end h-full gap-1.5"
-              title="${day.count} touchpoint${day.count === 1 ? '' : 's'}"
+              title="${day.count} touchpoints"
             >
               <span class="text-[10px] font-semibold text-neutral-500">
                 ${day.count}
               </span>
 
               <div
-                class="w-full rounded-t-md ${isToday ? 'bg-brand-600' : 'bg-brand-200'} transition-all"
-                style="height: ${heightPct}%"
+                class="w-full rounded-t-md ${
+                  today
+                    ? 'bg-brand-600'
+                    : 'bg-brand-200'
+                }"
+                style="height:${height}%"
               ></div>
 
-              <span class="text-[10px] font-medium ${isToday ? 'text-brand-700' : 'text-neutral-400'}">
+              <span class="text-[10px] font-medium ${
+                today
+                  ? 'text-brand-700'
+                  : 'text-neutral-400'
+              }">
                 ${day.label}
               </span>
             </div>
@@ -1086,9 +1074,9 @@ class App {
     `;
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                                LEADS VIEW                                  */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* LEADS                                                                      */
+  /* ========================================================================== */
 
   handleSearchChange(query) {
     this.searchQuery =
@@ -1118,67 +1106,16 @@ class App {
     this.renderLeadsTable();
   }
 
-  toggleTodayFilter(forceOn) {
-    this.filters.today =
-      typeof forceOn === 'boolean'
-        ? forceOn
-        : !this.filters.today;
-
-    const chip =
-      document.getElementById(
-        'filter-today-chip'
-      );
-
-    if (chip) {
-      chip.classList.toggle(
-        'bg-brand-600',
-        this.filters.today
-      );
-
-      chip.classList.toggle(
-        'text-white',
-        this.filters.today
-      );
-
-      chip.classList.toggle(
-        'border-brand-600',
-        this.filters.today
-      );
-
-      chip.classList.toggle(
-        'bg-white',
-        !this.filters.today
-      );
-
-      chip.classList.toggle(
-        'text-neutral-700',
-        !this.filters.today
-      );
-
-      chip.classList.toggle(
-        'border-neutral-300',
-        !this.filters.today
-      );
-    }
-
-    this.renderLeadsTable();
-  }
-
-  goToReachedToday() {
-    this.switchView('leads');
-    this.toggleTodayFilter(true);
-  }
-
   clearFilters() {
     this.searchQuery = '';
 
-    const searchInput =
+    const search =
       document.getElementById(
         'leads-search'
       );
 
-    if (searchInput) {
-      searchInput.value = '';
+    if (search) {
+      search.value = '';
     }
 
     [
@@ -1186,41 +1123,60 @@ class App {
       'filter-niche',
       'filter-followup'
     ].forEach(id => {
-      const el =
+      const element =
         document.getElementById(id);
 
-      if (el) {
-        el.value = '';
+      if (element) {
+        element.value = '';
       }
     });
 
     this.filters = {
       status: '',
       niche: '',
-      followup: '',
-      today: false
+      followup: ''
     };
 
-    const chip =
-      document.getElementById(
-        'filter-today-chip'
-      );
-
-    if (chip) {
-      chip.classList.remove(
-        'bg-brand-600',
-        'text-white',
-        'border-brand-600'
-      );
-
-      chip.classList.add(
-        'bg-white',
-        'text-neutral-700',
-        'border-neutral-300'
-      );
-    }
-
     this.renderLeadsTable();
+  }
+
+  updateNicheFilterOptions() {
+    const select =
+      document.getElementById(
+        'filter-niche'
+      );
+
+    if (!select) return;
+
+    const current =
+      select.value;
+
+    const niches =
+      [...new Set(
+        this.leads
+          .map(
+            lead =>
+              (lead.niche || '').trim()
+          )
+          .filter(Boolean)
+      )].sort();
+
+    select.innerHTML =
+      '<option value="">All Niches</option>';
+
+    niches.forEach(niche => {
+      const option =
+        document.createElement('option');
+
+      option.value = niche;
+      option.textContent = niche;
+
+      if (niche === current) {
+        option.selected = true;
+      }
+
+      select.appendChild(option);
+    });
   }
 
   getFilteredLeads() {
@@ -1229,21 +1185,7 @@ class App {
       end: todayEnd
     } = this.getTodayRange();
 
-    const reachedTodayIds =
-      this.filters.today
-        ? this.getLeadIdsReachedToday()
-        : null;
-
     return this.leads.filter(lead => {
-      if (
-        reachedTodayIds &&
-        !reachedTodayIds.has(
-          lead.lead_id
-        )
-      ) {
-        return false;
-      }
-
       if (this.searchQuery) {
         const haystack = [
           lead.business_name,
@@ -1282,7 +1224,7 @@ class App {
       }
 
       if (this.filters.followup) {
-        const followupTime =
+        const followup =
           lead.next_follow_up_at
             ? new Date(
                 lead.next_follow_up_at
@@ -1292,7 +1234,7 @@ class App {
         if (
           this.filters.followup ===
             'none' &&
-          followupTime
+          followup
         ) {
           return false;
         }
@@ -1300,7 +1242,7 @@ class App {
         if (
           this.filters.followup !==
             'none' &&
-          !followupTime
+          !followup
         ) {
           return false;
         }
@@ -1308,7 +1250,7 @@ class App {
         if (
           this.filters.followup ===
             'overdue' &&
-          followupTime >= todayStart
+          followup >= todayStart
         ) {
           return false;
         }
@@ -1317,10 +1259,8 @@ class App {
           this.filters.followup ===
             'today' &&
           (
-            followupTime <
-              todayStart ||
-            followupTime >
-              todayEnd
+            followup < todayStart ||
+            followup > todayEnd
           )
         ) {
           return false;
@@ -1329,7 +1269,7 @@ class App {
         if (
           this.filters.followup ===
             'upcoming' &&
-          followupTime <= todayEnd
+          followup <= todayEnd
         ) {
           return false;
         }
@@ -1340,220 +1280,205 @@ class App {
   }
 
   renderLeadsTable() {
-    const tableBody =
+    const body =
       document.getElementById(
         'leads-table-body'
       );
 
-    const summaryEl =
+    const summary =
       document.getElementById(
         'leads-table-summary'
       );
 
-    if (!tableBody) return;
+    if (!body) return;
 
-    const filtered =
+    const leads =
       this.getFilteredLeads();
 
-    if (summaryEl) {
-      summaryEl.textContent =
-        this.filters.today
-          ? `${filtered.length} lead${filtered.length === 1 ? '' : 's'} reached today (of ${this.leads.length} total)`
-          : `Showing ${filtered.length} of ${this.leads.length} leads`;
+    if (summary) {
+      summary.textContent =
+        `Showing ${leads.length} of ${this.leads.length} leads`;
     }
 
-    if (filtered.length === 0) {
-      if (this.leads.length === 0) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="7" class="text-center py-16">
-              <div class="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-3">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-              </div>
+    if (!leads.length) {
+      body.innerHTML = `
+        <tr>
+          <td colspan="8" class="text-center py-16">
+            <h4 class="text-base font-bold text-neutral-900">
+              ${
+                this.leads.length
+                  ? 'No leads match your filters'
+                  : 'Your lead list is empty'
+              }
+            </h4>
 
-              <h4 class="text-base font-bold text-neutral-900">
-                Your lead list is currently empty
-              </h4>
+            <p class="text-xs text-neutral-500 mt-1">
+              ${
+                this.leads.length
+                  ? 'Try clearing your filters.'
+                  : 'Add leads directly to Google Sheets, then refresh the CRM.'
+              }
+            </p>
 
-              <p class="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-                Add leads directly to Google Sheets, then refresh the CRM.
-              </p>
-            </td>
-          </tr>
-        `;
-      } else {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="7" class="text-center py-12">
-              <p class="text-sm font-medium text-neutral-700">
-                No leads match your search criteria
-              </p>
-
-              <p class="text-xs text-neutral-400 mt-1">
-                Try clearing some filters or searching for another keyword.
-              </p>
-
-              <button
-                onclick="app.clearFilters()"
-                class="mt-3 px-3 py-1.5 border border-neutral-300 rounded-md text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-              >
-                Reset filters
-              </button>
-            </td>
-          </tr>
-        `;
-      }
+            ${
+              this.leads.length
+                ? `
+                  <button
+                    onclick="app.clearFilters()"
+                    class="mt-3 px-3 py-1.5 border border-neutral-300 rounded-md text-xs font-medium"
+                  >
+                    Reset filters
+                  </button>
+                `
+                : ''
+            }
+          </td>
+        </tr>
+      `;
 
       return;
     }
 
-    const now = new Date();
+    const {
+      start: todayStart,
+      end: todayEnd
+    } = this.getTodayRange();
 
-    const todayStart =
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-      ).getTime();
+    body.innerHTML =
+      leads.map(lead => {
+        let followupBadge =
+          '<span class="text-neutral-400 text-xs">-</span>';
 
-    const todayEnd =
-      todayStart +
-      (24 * 60 * 60 * 1000) -
-      1;
+        if (lead.next_follow_up_at) {
+          const time =
+            new Date(
+              lead.next_follow_up_at
+            ).getTime();
 
-    tableBody.innerHTML =
-      filtered
-        .map(lead => {
-          let followUpBadge =
-            '<span class="text-neutral-400 text-xs">-</span>';
+          const formatted =
+            this.formatDateTime(
+              lead.next_follow_up_at
+            );
 
-          if (lead.next_follow_up_at) {
-            const followupTime =
-              new Date(
-                lead.next_follow_up_at
-              ).getTime();
-
-            const formattedDate =
-              this.formatDateTime(
-                lead.next_follow_up_at
-              );
-
-            if (
-              followupTime <
-              todayStart
-            ) {
-              followUpBadge =
-                `<span class="badge-status followup-overdue">Overdue: ${formattedDate}</span>`;
-            } else if (
-              followupTime >=
-                todayStart &&
-              followupTime <=
-                todayEnd
-            ) {
-              followUpBadge =
-                `<span class="badge-status followup-today">Today: ${formattedDate}</span>`;
-            } else {
-              followUpBadge =
-                `<span class="badge-status followup-upcoming">${formattedDate}</span>`;
-            }
+          if (time < todayStart) {
+            followupBadge = `
+              <span class="badge-status followup-overdue">
+                Overdue: ${formatted}
+              </span>
+            `;
+          } else if (
+            time >= todayStart &&
+            time <= todayEnd
+          ) {
+            followupBadge = `
+              <span class="badge-status followup-today">
+                Today: ${formatted}
+              </span>
+            `;
+          } else {
+            followupBadge = `
+              <span class="badge-status followup-upcoming">
+                ${formatted}
+              </span>
+            `;
           }
+        }
 
-          const lastActivityBadge =
-            lead.last_activity
-              ? `<span class="text-xs text-neutral-700">${this.formatDate(lead.last_activity)}</span>`
-              : `<span class="text-xs text-neutral-400">Never</span>`;
+        const igUrl =
+          this.getInstagramUrl(
+            lead.instagram_url
+          );
 
-          const instagramUrl =
-            lead.instagram_url || null;
+        const actions = `
+          <div class="flex items-center gap-2">
+            ${
+              igUrl
+                ? `
+                  <a
+                    href="${this.sanitizeExternalUrl(igUrl)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onclick="event.stopPropagation()"
+                    class="px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[11px] font-bold"
+                  >
+                    Open IG
+                  </a>
+                `
+                : ''
+            }
 
-          const actionsHtml = `
-            <div class="flex items-center gap-2">
-              ${
-                instagramUrl
-                  ? `
-                    <a
-                      href="${this.sanitizeExternalUrl(instagramUrl)}"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onclick="event.stopPropagation()"
-                      class="px-2.5 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded text-[11px] font-bold shadow-sm transition-colors"
-                    >
-                      Open IG
-                    </a>
-                  `
-                  : `
-                    <span class="text-neutral-400 text-[11px]">-</span>
-                  `
-              }
-
-              <button
-                onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(lead.lead_id))}'); event.stopPropagation();"
-                class="px-2.5 py-1 bg-brand-50 text-brand-700 hover:bg-brand-100 rounded text-[11px] font-bold shadow-sm transition-colors"
-              >
-                Open Lead
-              </button>
-            </div>
-          `;
-
-          return `
-            <tr
-              onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(lead.lead_id))}')"
-              class="table-row-hover"
+            <button
+              onclick="event.stopPropagation(); app.openLeadDrawer('${this.escapeJsString(lead.id)}')"
+              class="px-2.5 py-1 bg-brand-50 text-brand-700 hover:bg-brand-100 rounded text-[11px] font-bold"
             >
-              <td class="px-5 py-3.5 whitespace-nowrap">
-                <div class="font-semibold text-neutral-900">
-                  ${this.escapeHtml(lead.business_name)}
-                </div>
-              </td>
+              Open Lead
+            </button>
+          </div>
+        `;
 
-              <td class="px-4 py-3.5 whitespace-nowrap text-xs text-neutral-700">
-                ${this.escapeHtml(lead.location || '-')}
-              </td>
+        return `
+          <tr
+            onclick="app.openLeadDrawer('${this.escapeJsString(lead.id)}')"
+            class="table-row-hover"
+          >
+            <td class="px-5 py-3.5">
+              <div class="font-semibold text-neutral-900">
+                ${this.escapeHtml(lead.business_name)}
+              </div>
+            </td>
 
-              <td class="px-4 py-3.5 whitespace-nowrap text-xs text-neutral-700">
-                <span class="inline-block px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-medium">
-                  ${this.escapeHtml(lead.niche || '-')}
-                </span>
-              </td>
+            <td class="px-4 py-3.5 text-xs text-neutral-700">
+              ${this.escapeHtml(lead.location || '-')}
+            </td>
 
-              <td class="px-4 py-3.5 whitespace-nowrap">
-                ${actionsHtml}
-              </td>
+            <td class="px-4 py-3.5 text-xs">
+              <span class="inline-block px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-medium">
+                ${this.escapeHtml(lead.niche || '-')}
+              </span>
+            </td>
 
-              <td class="px-4 py-3.5 whitespace-nowrap">
-                <span class="badge-status status-${this.slugify(lead.status)}">
-                  ${this.escapeHtml(lead.status)}
-                </span>
-              </td>
+            <td class="px-4 py-3.5">
+              ${actions}
+            </td>
 
-              <td class="px-4 py-3.5 whitespace-nowrap">
-                ${followUpBadge}
-              </td>
+            <td class="px-4 py-3.5">
+              <span class="badge-status status-${this.slugify(lead.status)}">
+                ${this.escapeHtml(lead.status)}
+              </span>
+            </td>
 
-              <td class="px-4 py-3.5 whitespace-nowrap">
-                ${lastActivityBadge}
-              </td>
-            </tr>
-          `;
-        })
-        .join('');
+            <td class="px-4 py-3.5">
+              ${followupBadge}
+            </td>
+
+            <td class="px-4 py-3.5 text-xs">
+              ${
+                lead.dm_sent_date_time
+                  ? this.formatDate(
+                      lead.dm_sent_date_time
+                    )
+                  : 'Never'
+              }
+            </td>
+          </tr>
+        `;
+      }).join('');
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                            LEAD DETAIL DRAWER                              */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* LEAD DRAWER                                                                */
+  /* ========================================================================== */
 
   openLeadDrawer(leadId) {
     const lead =
       this.leads.find(
-        item => item.lead_id === leadId
+        item => item.id === leadId
       );
 
     if (!lead) return;
 
     this.activeLead = lead;
+
     this.renderLeadDrawerContent();
 
     const drawer =
@@ -1632,7 +1557,8 @@ class App {
   }
 
   renderLeadDrawerContent() {
-    const lead = this.activeLead;
+    const lead =
+      this.activeLead;
 
     if (!lead) return;
 
@@ -1643,7 +1569,7 @@ class App {
 
     this.setElemText(
       'drawer-lead-id',
-      lead.lead_id
+      lead.id
     );
 
     this.setElemText(
@@ -1657,6 +1583,11 @@ class App {
     );
 
     this.setElemText(
+      'drawer-lead-source',
+      'Google Sheets'
+    );
+
+    this.setElemText(
       'drawer-notes',
       lead.notes || 'No notes recorded.'
     );
@@ -1665,35 +1596,6 @@ class App {
       'drawer-instagram-handle',
       lead.instagram_url || 'Not set'
     );
-
-    // Instagram URL is stored as a complete URL.
-    const igBtn =
-      document.getElementById(
-        'btn-drawer-open-ig'
-      );
-
-    if (igBtn) {
-      if (lead.instagram_url) {
-        igBtn.href =
-          this.sanitizeExternalUrl(
-            lead.instagram_url
-          );
-
-        igBtn.classList.remove(
-          'pointer-events-none',
-          'opacity-50'
-        );
-      } else {
-        igBtn.removeAttribute(
-          'href'
-        );
-
-        igBtn.classList.add(
-          'pointer-events-none',
-          'opacity-50'
-        );
-      }
-    }
 
     const statusBadge =
       document.getElementById(
@@ -1705,16 +1607,16 @@ class App {
         `badge-status status-${this.slugify(lead.status)}`;
 
       statusBadge.textContent =
-        lead.status || '-';
+        lead.status;
     }
 
-    const followupEl =
+    const nextFollowup =
       document.getElementById(
         'drawer-next-followup'
       );
 
-    if (followupEl) {
-      followupEl.textContent =
+    if (nextFollowup) {
+      nextFollowup.textContent =
         lead.next_follow_up_at
           ? this.formatDateTime(
               lead.next_follow_up_at
@@ -1722,81 +1624,121 @@ class App {
           : 'None scheduled';
     }
 
-    const contactedEl =
+    const lastContacted =
       document.getElementById(
         'drawer-last-contacted'
       );
 
-    if (contactedEl) {
-      contactedEl.textContent =
-        lead.last_activity
+    if (lastContacted) {
+      lastContacted.textContent =
+        lead.dm_sent_date_time
           ? this.formatDateTime(
-              lead.last_activity
+              lead.dm_sent_date_time
             )
           : 'Never contacted';
     }
 
-    // Quick outreach actions.
-    const quickActionsEl =
+    this.renderQuickActions();
+    this.renderLeadLinks();
+    this.renderLeadActivities();
+  }
+
+  renderQuickActions() {
+    const container =
       document.getElementById(
         'drawer-quick-actions'
       );
 
-    if (quickActionsEl) {
-      let actionButton = '';
-
-      const status =
-        (lead.status || '').toUpperCase();
-
-      const closedStatuses = [
-        'REPLIED',
-        'CALL BOOKED',
-        'CALL COMPLETED',
-        'PROPOSAL SENT',
-        'WON',
-        'LOST'
-      ];
-
-      if (
-        status === 'NOT CONTACTED' ||
-        status === 'NEW' ||
-        status === 'RESEARCHING' ||
-        status === 'READY TO CONTACT'
-      ) {
-        actionButton = `
-          <button
-            onclick="app.markDmSent('${this.escapeJsString(lead.lead_id)}')"
-            class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-
-            <span>Mark DM Sent</span>
-          </button>
-        `;
-      } else if (
-        !closedStatuses.includes(status)
-      ) {
-        actionButton = `
-          <button
-            onclick="app.markFollowedUp('${this.escapeJsString(lead.lead_id)}')"
-            class="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-
-            <span>Mark Followed Up</span>
-          </button>
-        `;
-      }
-
-      quickActionsEl.innerHTML =
-        actionButton;
+    if (!container || !this.activeLead) {
+      return;
     }
 
-    // Website link.
+    const lead =
+      this.activeLead;
+
+    const status =
+      (lead.status || '').toUpperCase();
+
+    let optionsHtml = '';
+    window.CONFIG.STATUSES.forEach(s => {
+      const selected = s === status ? 'selected' : '';
+      optionsHtml += `<option value="${s}" ${selected}>${s}</option>`;
+    });
+
+    container.innerHTML = `
+      <div class="flex items-center gap-2">
+        <label class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Change Status:</label>
+        <select 
+          onchange="app.changeLeadStatus('${this.escapeJsString(lead.id)}', this.value)"
+          class="text-xs bg-white border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500 font-semibold"
+        >
+          ${optionsHtml}
+        </select>
+      </div>
+    `;
+  }
+
+  async changeLeadStatus(leadId, newStatus) {
+    const lead = this.leads.find(item => item.id === leadId);
+    if (!lead) return;
+
+    try {
+      const updatedLead = await dbService.updateLead(
+        lead.id,
+        {
+          status: newStatus,
+          dm_sent_date_time: newStatus === 'DM_SENT' ? this.getNowLocalIso() : lead.dm_sent_date_time
+        },
+        this.leads
+      );
+
+      this.applyLocalLead(updatedLead);
+      this.showToast(`Status updated to ${newStatus}`, 'success');
+    } catch (error) {
+      console.error('Error updating status:', error);
+      this.showToast(error.message || 'Could not update status', 'error');
+    }
+  }
+
+  renderLeadLinks() {
+    const lead =
+      this.activeLead;
+
+    if (!lead) return;
+
+    const igUrl =
+      this.getInstagramUrl(
+        lead.instagram_url
+      );
+
+    const igButton =
+      document.getElementById(
+        'btn-drawer-open-ig'
+      );
+
+    if (igButton) {
+      if (igUrl) {
+        igButton.href =
+          this.sanitizeExternalUrl(
+            igUrl
+          );
+
+        igButton.classList.remove(
+          'pointer-events-none',
+          'opacity-50'
+        );
+      } else {
+        igButton.removeAttribute(
+          'href'
+        );
+
+        igButton.classList.add(
+          'pointer-events-none',
+          'opacity-50'
+        );
+      }
+    }
+
     this.setupDrawerLink(
       'drawer-website-link',
       this.sanitizeExternalUrl(
@@ -1805,129 +1747,118 @@ class App {
       lead.website
     );
 
-    // Instagram link.
     this.setupDrawerLink(
       'drawer-instagram-link',
-      lead.instagram_url
+      igUrl
         ? this.sanitizeExternalUrl(
-            lead.instagram_url
+            igUrl
           )
         : null,
       lead.instagram_url
     );
+  }
 
-    // Activity timeline.
-    const leadActivities =
-      this.activities
-        .filter(
-          activity =>
-            activity.lead_id ===
-            lead.lead_id
-        )
-        .sort(
-          (a, b) =>
-            new Date(
-              b.activity_at || 0
-            ) -
-            new Date(
-              a.activity_at || 0
-            )
-        );
+  renderLeadActivities() {
+    const lead =
+      this.activeLead;
 
-    const actListContainer =
+    const container =
       document.getElementById(
         'drawer-activities-list'
       );
 
-    if (actListContainer) {
-      if (leadActivities.length === 0) {
-        actListContainer.innerHTML = `
-          <div class="p-4 bg-neutral-50 rounded-lg text-center text-xs text-neutral-400">
-            No outreach touchpoints logged for this lead yet.
-          </div>
-        `;
-      } else {
-        actListContainer.innerHTML =
-          leadActivities
-            .map(activity => `
-              <div class="p-3.5 bg-neutral-50 rounded-lg border border-neutral-200 text-xs space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="font-bold text-neutral-900">
-                    ${this.escapeHtml(activity.activity_type)}
-                  </span>
-
-                  <span class="text-[11px] text-neutral-400 font-medium">
-                    ${this.formatDateTime(activity.activity_at)}
-                  </span>
-                </div>
-
-                <div class="flex items-center gap-2 text-neutral-500 text-[11px]">
-                  <span class="font-medium text-neutral-700">
-                    Instagram
-                  </span>
-
-                  ${
-                    activity.outcome
-                      ? `
-                        <span>&bull;</span>
-                        <span>
-                          Outcome:
-                          ${this.escapeHtml(activity.outcome)}
-                        </span>
-                      `
-                      : ''
-                  }
-                </div>
-
-                ${
-                  activity.summary || activity.message
-                    ? `
-                      <p class="text-neutral-800 font-medium">
-                        ${this.escapeHtml(
-                          activity.summary ||
-                          activity.message
-                        )}
-                      </p>
-                    `
-                    : ''
-                }
-
-                ${
-                  activity.notes
-                    ? `
-                      <p class="text-neutral-600 bg-white p-2 rounded border border-neutral-100 text-[11px] whitespace-pre-wrap">
-                        ${this.escapeHtml(activity.notes)}
-                      </p>
-                    `
-                    : ''
-                }
-              </div>
-            `)
-            .join('');
-      }
+    if (!lead || !container) {
+      return;
     }
+
+    const activities =
+      this.activities
+        .filter(
+          activity =>
+            activity.lead_id ===
+            lead.id
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.date || 0) -
+            new Date(a.date || 0)
+        );
+
+    if (!activities.length) {
+      container.innerHTML = `
+        <div class="p-4 bg-neutral-50 rounded-lg text-center text-xs text-neutral-400">
+          No outreach touchpoints logged yet.
+        </div>
+      `;
+
+      return;
+    }
+
+    container.innerHTML =
+      activities.map(activity => `
+        <div class="p-3.5 bg-neutral-50 rounded-lg border border-neutral-200 text-xs space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-neutral-900">
+              ${this.escapeHtml(activity.type)}
+            </span>
+
+            <span class="text-[11px] text-neutral-400">
+              ${this.formatDateTime(activity.date)}
+            </span>
+          </div>
+
+          ${
+            activity.outcome
+              ? `
+                <div class="text-[11px] text-neutral-500">
+                  Outcome:
+                  <span class="font-medium">
+                    ${this.escapeHtml(activity.outcome)}
+                  </span>
+                </div>
+              `
+              : ''
+          }
+
+          <p class="text-neutral-800 font-medium">
+            ${this.escapeHtml(activity.message)}
+          </p>
+
+          ${
+            activity.notes
+              ? `
+                <p class="text-neutral-600 bg-white p-2 rounded border border-neutral-100 whitespace-pre-wrap">
+                  ${this.escapeHtml(activity.notes)}
+                </p>
+              `
+              : ''
+          }
+        </div>
+      `).join('');
   }
 
   setupDrawerLink(
-    elemId,
+    elementId,
     url,
-    displayLabel
+    label
   ) {
-    const el =
-      document.getElementById(elemId);
+    const element =
+      document.getElementById(
+        elementId
+      );
 
-    if (!el) return;
+    if (!element) return;
 
-    if (url && displayLabel) {
-      el.href = url;
-      el.textContent = displayLabel;
+    if (url && label) {
+      element.href = url;
+      element.textContent = label;
 
-      el.classList.remove(
+      element.classList.remove(
         'pointer-events-none',
         'text-neutral-400'
       );
 
-      el.classList.add(
+      element.classList.add(
         'text-brand-600',
         'hover:underline'
       );
@@ -1935,38 +1866,32 @@ class App {
       return;
     }
 
-    el.removeAttribute('href');
-    el.textContent = '-';
+    element.removeAttribute(
+      'href'
+    );
 
-    el.classList.add(
+    element.textContent = '-';
+
+    element.classList.add(
       'pointer-events-none',
       'text-neutral-400'
     );
 
-    el.classList.remove(
+    element.classList.remove(
       'text-brand-600',
       'hover:underline'
     );
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                            FOLLOW-UPS DESK VIEW                            */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* FOLLOW-UPS                                                                 */
+  /* ========================================================================== */
 
   renderFollowups() {
-    const now = new Date();
-
-    const todayStart =
-      new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-      ).getTime();
-
-    const todayEnd =
-      todayStart +
-      (24 * 60 * 60 * 1000) -
-      1;
+    const {
+      start: todayStart,
+      end: todayEnd
+    } = this.getTodayRange();
 
     const overdue = [];
     const today = [];
@@ -1979,21 +1904,21 @@ class App {
         return;
       }
 
-      const followupTime =
+      const time =
         new Date(
           lead.next_follow_up_at
         ).getTime();
 
-      if (isNaN(followupTime)) {
+      if (isNaN(time)) {
         none.push(lead);
         return;
       }
 
-      if (followupTime < todayStart) {
+      if (time < todayStart) {
         overdue.push(lead);
       } else if (
-        followupTime >= todayStart &&
-        followupTime <= todayEnd
+        time >= todayStart &&
+        time <= todayEnd
       ) {
         today.push(lead);
       } else {
@@ -2001,13 +1926,14 @@ class App {
       }
     });
 
-    const sortByFollowup = (a, b) =>
-      new Date(
-        a.next_follow_up_at
-      ) -
-      new Date(
-        b.next_follow_up_at
-      );
+    const sortByFollowup =
+      (a, b) =>
+        new Date(
+          a.next_follow_up_at
+        ) -
+        new Date(
+          b.next_follow_up_at
+        );
 
     overdue.sort(sortByFollowup);
     today.sort(sortByFollowup);
@@ -2060,8 +1986,8 @@ class App {
 
   renderFollowupGroup(
     containerId,
-    list,
-    emptyMsg
+    leads,
+    emptyMessage
   ) {
     const container =
       document.getElementById(
@@ -2070,10 +1996,10 @@ class App {
 
     if (!container) return;
 
-    if (list.length === 0) {
+    if (!leads.length) {
       container.innerHTML = `
-        <div class="p-4 text-center text-xs text-neutral-400 font-medium">
-          ${emptyMsg}
+        <div class="p-4 text-center text-xs text-neutral-400">
+          ${emptyMessage}
         </div>
       `;
 
@@ -2081,102 +2007,90 @@ class App {
     }
 
     container.innerHTML =
-      list
-        .map(lead => {
-          const instagramUrl =
-            lead.instagram_url || null;
+      leads.map(lead => {
+        const igUrl =
+          this.getInstagramUrl(
+            lead.instagram_url
+          );
 
-          const status =
-            (lead.status || '').toUpperCase();
+        const status =
+          (lead.status || '')
+            .toUpperCase();
 
-          const closedStatuses = [
-            'REPLIED',
-            'CALL BOOKED',
-            'CALL COMPLETED',
-            'PROPOSAL SENT',
-            'WON',
-            'LOST'
-          ];
+        const closed = [
+          'REPLIED',
+          'CALL_BOOKED',
+          'CALL COMPLETED',
+          'PROPOSAL SENT',
+          'WON',
+          'LOST'
+        ];
 
-          const showFollowUpButton =
-            !closedStatuses.includes(
-              status
-            );
+        return `
+          <div class="py-3 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50 rounded-lg">
 
-          return `
-            <div class="py-3 px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-neutral-50 rounded-lg transition-colors">
+            <div
+              class="cursor-pointer flex-1"
+              onclick="app.openLeadDrawer('${this.escapeJsString(lead.id)}')"
+            >
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-semibold text-neutral-900">
+                  ${this.escapeHtml(lead.business_name)}
+                </span>
 
-              <div
-                class="cursor-pointer flex-1"
-                onclick="app.openLeadDrawer('${this.escapeHtml(this.escapeJsString(lead.lead_id))}')"
-              >
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-semibold text-neutral-900 hover:text-brand-600">
-                    ${this.escapeHtml(lead.business_name)}
-                  </span>
-
-                  <span class="badge-status status-${this.slugify(lead.status)} text-[10px]">
-                    ${this.escapeHtml(lead.status)}
-                  </span>
-                </div>
-
-                <div class="text-xs text-neutral-500 mt-1 flex items-center gap-3">
-                  <span>&bull;</span>
-
-                  <span>
-                    Last touch:
-                    ${
-                      lead.last_activity
-                        ? this.formatDateTime(
-                            lead.last_activity
-                          )
-                        : 'Never'
-                    }
-                  </span>
-                </div>
+                <span class="badge-status status-${this.slugify(lead.status)} text-[10px]">
+                  ${this.escapeHtml(lead.status)}
+                </span>
               </div>
 
-              <div class="flex items-center gap-2">
-                ${
-                  instagramUrl
-                    ? `
-                      <a
-                        href="${this.sanitizeExternalUrl(instagramUrl)}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onclick="event.stopPropagation()"
-                        class="px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md text-xs font-semibold shadow-sm transition-colors"
-                      >
-                        Open IG
-                      </a>
-                    `
-                    : ''
-                }
-
-                ${
-                  showFollowUpButton
-                    ? `
-                      <button
-                        onclick="event.stopPropagation(); app.markFollowedUp('${this.escapeJsString(lead.lead_id)}')"
-                        class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md text-xs font-semibold shadow-sm transition-colors"
-                      >
-                        Mark Followed Up
-                      </button>
-                    `
-                    : ''
-                }
-
-                <button
-                  onclick="app.quickSetFollowup('${this.escapeJsString(lead.lead_id)}', event)"
-                  class="px-2.5 py-1.5 border border-neutral-300 hover:bg-white text-neutral-700 text-xs font-medium rounded-md shadow-sm transition-colors"
-                >
-                  Reschedule
-                </button>
+              <div class="text-xs text-neutral-500 mt-1">
+                Next:
+                ${this.formatDateTime(lead.next_follow_up_at)}
               </div>
             </div>
-          `;
-        })
-        .join('');
+
+            <div class="flex items-center gap-2">
+
+              ${
+                igUrl
+                  ? `
+                    <a
+                      href="${this.sanitizeExternalUrl(igUrl)}"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onclick="event.stopPropagation()"
+                      class="px-2.5 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md text-xs font-semibold"
+                    >
+                      Open IG
+                    </a>
+                  `
+                  : ''
+              }
+
+              ${
+                !closed.includes(status)
+                  ? `
+                    <button
+                      onclick="event.stopPropagation(); app.markFollowedUp('${this.escapeJsString(lead.id)}')"
+                      class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-md text-xs font-semibold"
+                    >
+                      Mark Followed Up
+                    </button>
+                  `
+                  : ''
+              }
+
+              <button
+                onclick="app.quickSetFollowup('${this.escapeJsString(lead.id)}', event)"
+                class="px-2.5 py-1.5 border border-neutral-300 hover:bg-white text-neutral-700 text-xs font-medium rounded-md"
+              >
+                Reschedule
+              </button>
+
+            </div>
+          </div>
+        `;
+      }).join('');
   }
 
   quickSetFollowup(
@@ -2189,8 +2103,7 @@ class App {
 
     const lead =
       this.leads.find(
-        item =>
-          item.lead_id === leadId
+        item => item.id === leadId
       );
 
     if (!lead) return;
@@ -2199,16 +2112,14 @@ class App {
     this.openSetFollowupModal();
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                              MODAL OPERATIONS                              */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* ACTIVITY MODAL                                                             */
+  /* ========================================================================== */
 
   openAddActivityModal(
     defaultType = 'Initial DM'
   ) {
-    const lead = this.activeLead;
-
-    if (!lead) return;
+    if (!this.activeLead) return;
 
     const modal =
       document.getElementById(
@@ -2241,12 +2152,6 @@ class App {
       document.getElementById(
         'act-type'
       );
-
-    const channel =
-      document.getElementById(
-        'act-channel'
-      );
-
     if (summary) {
       summary.value =
         defaultType === 'Initial DM'
@@ -2257,7 +2162,7 @@ class App {
     if (outcome) {
       outcome.value =
         defaultType === 'Initial DM'
-          ? 'DM Sent'
+          ? 'DM_SENT'
           : '';
     }
 
@@ -2273,48 +2178,40 @@ class App {
     if (type) {
       type.value = defaultType;
     }
-
-    if (channel) {
-      channel.value = 'Instagram';
-    }
-
     modal.showModal();
   }
 
-  async submitAddActivity(e) {
-    e.preventDefault();
+  async submitAddActivity(event) {
+    event.preventDefault();
+
+    if (!this.activeLead) return;
 
     const modal =
       document.getElementById(
         'modal-add-activity'
       );
 
-    const btnSubmit =
+    const button =
       document.getElementById(
         'btn-submit-add-activity'
       );
 
-    const lead = this.activeLead;
+    const activity = {
+      lead_id:
+        this.activeLead.id,
 
-    if (!lead) return;
-
-    const actData = {
-      lead_id: lead.lead_id,
-
-      activity_type:
+      type:
         document.getElementById(
           'act-type'
         )?.value || 'Initial DM',
 
-      // Instagram-only CRM.
-      channel: 'Instagram',
-
-      activity_at:
+      date:
         document.getElementById(
           'act-datetime'
-        )?.value || this.getNowLocalIso(),
+        )?.value ||
+        this.getNowLocalIso(),
 
-      summary:
+      message:
         document.getElementById(
           'act-summary'
         )?.value || '',
@@ -2331,69 +2228,250 @@ class App {
     };
 
     try {
-      if (btnSubmit) {
-        btnSubmit.disabled = true;
-        btnSubmit.textContent =
-          'Logging Touchpoint...';
+      if (button) {
+        button.disabled = true;
+        button.textContent =
+          'Logging...';
       }
 
-      const res =
+      const result =
         await dbService.addActivity(
-          actData,
-          lead
+          activity,
+          this.activeLead
         );
 
-      if (res && res.activity) {
+      if (result?.activity) {
         this.applyLocalActivity(
-          res.activity
+          result.activity
         );
       }
 
-      if (res && res.updatedLead) {
+      if (result?.updatedLead) {
         this.applyLocalLead(
-          res.updatedLead
-        );
-      }
-
-      if (res && res.partialSuccess) {
-        this.showToast(
-          res.warning,
-          'warning'
-        );
-      } else {
-        this.showToast(
-          'Outreach touchpoint logged successfully!',
-          'success'
+          result.updatedLead
         );
       }
 
       if (modal) {
         modal.close();
       }
-    } catch (err) {
+
+      this.showToast(
+        'Outreach activity logged',
+        'success'
+      );
+    } catch (error) {
       console.error(
         'Error logging activity:',
-        err
+        error
       );
 
       this.showToast(
-        err.message ||
-          'Could not log activity.',
+        error.message ||
+        'Could not log activity',
         'error'
       );
     } finally {
-      if (btnSubmit) {
-        btnSubmit.disabled = false;
-        btnSubmit.textContent =
+      if (button) {
+        button.disabled = false;
+        button.textContent =
           'Log Activity';
       }
     }
   }
 
-  openSetFollowupModal() {
-    const lead = this.activeLead;
+  /* ========================================================================== */
+  /* MARK DM SENT                                                               */
+  /* ========================================================================== */
+
+  async markDmSent(leadId) {
+    const lead =
+      this.leads.find(
+        item => item.id === leadId
+      );
 
     if (!lead) return;
+
+    try {
+      const activity = {
+        lead_id: lead.id,
+        type: 'Initial DM',
+        date: this.getNowLocalIso(),
+        message:
+          'Sent initial Instagram DM',
+        outcome: 'DM_SENT',
+        notes: ''
+      };
+
+      const result =
+        await dbService.addActivity(
+          activity,
+          lead
+        );
+
+      if (result?.activity) {
+        this.applyLocalActivity(
+          result.activity
+        );
+      }
+
+      let updatedLead =
+        result?.updatedLead ||
+        lead;
+
+      if (
+        ![
+          'DM_SENT',
+          'REPLIED',
+          'CALL_BOOKED',
+          'WON'
+        ].includes(
+          (updatedLead.status || '')
+            .toUpperCase()
+        )
+      ) {
+        updatedLead =
+          await dbService.updateLead(
+            lead.id,
+            {
+              status: 'DM_SENT',
+              dm_sent_date_time:
+                this.getNowLocalIso()
+            },
+            this.leads
+          );
+
+        this.applyLocalLead(
+          updatedLead
+        );
+      }
+
+      this.showToast(
+        'Initial DM marked as sent',
+        'success'
+      );
+    } catch (error) {
+      console.error(
+        'Error marking DM sent:',
+        error
+      );
+
+      this.showToast(
+        error.message ||
+        'Could not mark DM sent',
+        'error'
+      );
+    }
+  }
+
+  /* ========================================================================== */
+  /* MARK FOLLOW-UP SENT                                                        */
+  /* ========================================================================== */
+
+  async markFollowedUp(leadId) {
+    const lead =
+      this.leads.find(
+        item => item.id === leadId
+      );
+
+    if (!lead) return;
+
+    try {
+      const previousFollowups =
+        this.activities.filter(
+          activity =>
+            activity.lead_id === leadId &&
+            String(
+              activity.type || ''
+            )
+              .toLowerCase()
+              .startsWith(
+                'follow-up'
+              )
+        );
+
+      const number =
+        Math.min(
+          previousFollowups.length + 1,
+          3
+        );
+
+      const activity = {
+        lead_id: lead.id,
+
+        type:
+          `Follow-up #${number}`,
+
+        date:
+          this.getNowLocalIso(),
+
+        message:
+          'Sent Instagram follow-up',
+
+        outcome:
+          'Follow-up Sent',
+
+        notes: ''
+      };
+
+      const result =
+        await dbService.addActivity(
+          activity,
+          lead
+        );
+
+      if (result?.activity) {
+        this.applyLocalActivity(
+          result.activity
+        );
+      }
+
+      const nextFollowup =
+        this.getFutureLocalIso(3);
+
+      const updatedLead =
+        await dbService.updateLead(
+          lead.id,
+          {
+            status: 'DM_SENT',
+            next_followup:
+              nextFollowup,
+            follow_up_count:
+              previousFollowups.length + 1,
+            dm_sent_date_time:
+              this.getNowLocalIso()
+          },
+          this.leads
+        );
+
+      this.applyLocalLead(
+        updatedLead
+      );
+
+      this.showToast(
+        'Follow-up logged. Next follow-up in 3 days.',
+        'success'
+      );
+    } catch (error) {
+      console.error(
+        'Error marking follow-up:',
+        error
+      );
+
+      this.showToast(
+        error.message ||
+        'Could not mark follow-up',
+        'error'
+      );
+    }
+  }
+
+  /* ========================================================================== */
+  /* FOLLOW-UP MODAL                                                            */
+  /* ========================================================================== */
+
+  openSetFollowupModal() {
+    if (!this.activeLead) return;
 
     const modal =
       document.getElementById(
@@ -2402,33 +2480,32 @@ class App {
 
     if (!modal) return;
 
-    const leadIdInput =
+    const idInput =
       document.getElementById(
         'set-followup-lead-id'
       );
 
-    const datetimeInput =
+    const dateInput =
       document.getElementById(
         'set-followup-datetime'
       );
 
-    if (leadIdInput) {
-      leadIdInput.value =
-        lead.lead_id;
+    if (idInput) {
+      idInput.value =
+        this.activeLead.id;
     }
 
-    if (datetimeInput) {
-      datetimeInput.value =
-        lead.next_follow_up_at ||
+    if (dateInput) {
+      dateInput.value =
+        this.activeLead
+          .next_follow_up_at ||
         this.getFutureLocalIso(1);
     }
 
     modal.showModal();
   }
 
-  setFollowupPreset(
-    daysAhead
-  ) {
+  setFollowupPreset(daysAhead) {
     const input =
       document.getElementById(
         'set-followup-datetime'
@@ -2442,433 +2519,169 @@ class App {
     }
   }
 
-  async submitSetFollowup(e) {
-    e.preventDefault();
+  async submitSetFollowup(event) {
+    event.preventDefault();
+
+    if (!this.activeLead) return;
 
     const modal =
       document.getElementById(
         'modal-set-followup'
       );
 
-    const lead = this.activeLead;
-
-    if (!lead) return;
-
-    const input =
+    const value =
       document.getElementById(
         'set-followup-datetime'
+      )?.value;
+
+    if (!value) {
+      this.showToast(
+        'Select a follow-up date',
+        'error'
       );
 
-    const nextFollowup =
-      input?.value || '';
+      return;
+    }
 
     try {
       const updatedLead =
         await dbService.updateLead(
-          lead.lead_id,
+          this.activeLead.id,
           {
-            next_follow_up_at:
-              nextFollowup
+            next_followup: value
           },
-          this.allLeadsRaw
+          this.leads
         );
 
       this.applyLocalLead(
         updatedLead
       );
 
-      this.showToast(
-        'Follow-up schedule updated',
-        'success'
-      );
-
       if (modal) {
         modal.close();
       }
-    } catch (err) {
+
+      this.showToast(
+        'Follow-up scheduled',
+        'success'
+      );
+    } catch (error) {
       console.error(
-        'Error setting follow-up:',
-        err
+        'Error scheduling follow-up:',
+        error
       );
 
       this.showToast(
-        err.message ||
-          'Could not update follow-up.',
+        error.message ||
+        'Could not schedule follow-up',
         'error'
       );
     }
   }
 
   async clearFollowup() {
+    if (!this.activeLead) return;
+
     const modal =
       document.getElementById(
         'modal-set-followup'
       );
 
-    const lead = this.activeLead;
-
-    if (!lead) return;
-
     try {
       const updatedLead =
         await dbService.updateLead(
-          lead.lead_id,
+          this.activeLead.id,
           {
-            next_follow_up_at: ''
+            next_followup: ''
           },
-          this.allLeadsRaw
+          this.leads
         );
 
       this.applyLocalLead(
         updatedLead
-      );
-
-      this.showToast(
-        'Follow-up cleared',
-        'success'
       );
 
       if (modal) {
         modal.close();
       }
-    } catch (err) {
+
+      this.showToast(
+        'Follow-up cleared',
+        'success'
+      );
+    } catch (error) {
       console.error(
         'Error clearing follow-up:',
-        err
+        error
       );
 
       this.showToast(
-        'Could not clear follow-up.',
+        error.message ||
+        'Could not clear follow-up',
         'error'
       );
     }
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                              OUTREACH ACTIONS                              */
-  /* -------------------------------------------------------------------------- */
+  /* ========================================================================== */
+  /* UTILITIES                                                                  */
+  /* ========================================================================== */
 
-  async markDmSent(leadId) {
-    const lead =
-      this.leads.find(
-        item =>
-          item.lead_id === leadId
-      );
+  getInstagramUrl(value) {
+    if (!value) return null;
 
-    if (!lead) return;
+    const raw =
+      String(value).trim();
+
+    if (!raw) return null;
+
+    if (
+      /^https?:\/\//i.test(raw)
+    ) {
+      return raw;
+    }
+
+    return `https://instagram.com/${raw.replace(/^@/, '')}`;
+  }
+
+  sanitizeExternalUrl(value) {
+    if (
+      !value ||
+      typeof value !== 'string'
+    ) {
+      return null;
+    }
+
+    const raw =
+      value.trim();
+
+    if (!raw) return null;
+
+    const candidate =
+      /^https?:\/\//i.test(raw)
+        ? raw
+        : `https://${raw}`;
 
     try {
-      const activity = {
-        lead_id: lead.lead_id,
-        activity_type: 'Initial DM',
-        channel: 'Instagram',
-        activity_at:
-          this.getNowLocalIso(),
-        summary:
-          'Sent initial Instagram DM',
-        outcome: 'DM Sent',
-        notes: ''
-      };
-
-      const res =
-        await dbService.addActivity(
-          activity,
-          lead
-        );
-
-      if (res && res.activity) {
-        this.applyLocalActivity(
-          res.activity
-        );
-      }
-
-      if (res && res.updatedLead) {
-        this.applyLocalLead(
-          res.updatedLead
-        );
-      }
-
-      const currentLead =
-        res && res.updatedLead
-          ? res.updatedLead
-          : lead;
-
-      const currentStatus =
-        (currentLead.status || '')
-          .toUpperCase();
-
-      const initialStatuses = [
-        'NOT CONTACTED',
-        'NEW',
-        'RESEARCHING',
-        'READY TO CONTACT'
-      ];
+      const url =
+        new URL(candidate);
 
       if (
-        currentStatus !== 'DM SENT' &&
-        initialStatuses.includes(
-          (lead.status || '').toUpperCase()
-        )
+        url.protocol !== 'https:' &&
+        url.protocol !== 'http:'
       ) {
-        const updatedLead =
-          await dbService.updateLead(
-            lead.lead_id,
-            {
-              status: 'DM SENT'
-            },
-            this.allLeadsRaw
-          );
-
-        this.applyLocalLead(
-          updatedLead
-        );
+        return null;
       }
 
-      this.showToast(
-        'Initial DM marked as sent',
-        'success'
-      );
-    } catch (err) {
-      console.error(
-        'Error marking DM sent:',
-        err
-      );
-
-      this.showToast(
-        'Could not mark DM sent',
-        'error'
-      );
-    }
-  }
-
-  async markFollowedUp(
-    leadId
-  ) {
-    const lead =
-      this.leads.find(
-        item =>
-          item.lead_id === leadId
-      );
-
-    if (!lead) return;
-
-    try {
-      const leadActivities =
-        this.activities.filter(
-          activity =>
-            activity.lead_id ===
-            leadId
-        );
-
-      const followUpCount =
-        leadActivities.filter(
-          activity =>
-            String(
-              activity.activity_type ||
-              ''
-            ).startsWith(
-              'Follow-up'
-            )
-        ).length + 1;
-
-      const activityNumber =
-        Math.min(
-          followUpCount,
-          3
-        );
-
-      const activityType =
-        `Follow-up #${activityNumber}`;
-
-      const activity = {
-        lead_id: lead.lead_id,
-        activity_type:
-          activityType,
-        channel: 'Instagram',
-        activity_at:
-          this.getNowLocalIso(),
-        summary:
-          'Sent Instagram follow-up',
-        outcome:
-          'Follow-up Sent',
-        notes: ''
-      };
-
-      const res =
-        await dbService.addActivity(
-          activity,
-          lead
-        );
-
-      if (res && res.activity) {
-        this.applyLocalActivity(
-          res.activity
-        );
-      }
-
-      if (res && res.updatedLead) {
-        this.applyLocalLead(
-          res.updatedLead
-        );
-      }
-
-      const nextFollowup =
-        this.getFutureLocalIso(3);
-
-      const updatedLead =
-        await dbService.updateLead(
-          lead.lead_id,
-          {
-            next_follow_up_at:
-              nextFollowup
-          },
-          this.allLeadsRaw
-        );
-
-      this.applyLocalLead(
-        updatedLead
-      );
-
-      this.showToast(
-        'Follow-up logged. Next follow-up in 3 days.',
-        'success'
-      );
-    } catch (err) {
-      console.error(
-        'Error marking followed up:',
-        err
-      );
-
-      this.showToast(
-        'Could not mark follow-up',
-        'error'
-      );
-    }
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                            UTILITY & FORMATTERS                            */
-  /* -------------------------------------------------------------------------- */
-
-  showToast(
-    message,
-    type = 'info'
-  ) {
-    const container =
-      document.getElementById(
-        'toast-container'
-      );
-
-    if (!container) return;
-
-    const toast =
-      document.createElement('div');
-
-    toast.className =
-      `toast-item ${type}`;
-
-    let iconSvg = '';
-
-    if (type === 'success') {
-      iconSvg = `
-        <svg class="w-4 h-4 text-emerald-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-      `;
-    } else if (type === 'error') {
-      iconSvg = `
-        <svg class="w-4 h-4 text-red-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      `;
-    } else if (type === 'warning') {
-      iconSvg = `
-        <svg class="w-4 h-4 text-amber-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71 3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        </svg>
-      `;
-    } else {
-      iconSvg = `
-        <svg class="w-4 h-4 text-neutral-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-      `;
-    }
-
-    toast.innerHTML =
-      `${iconSvg}<span class="flex-1">${this.escapeHtml(message)}</span>`;
-
-    container.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform =
-        'translateY(8px)';
-      toast.style.transition =
-        'all 0.2s ease-out';
-
-      setTimeout(
-        () => toast.remove(),
-        200
-      );
-    }, 4000);
-  }
-
-  formatDateTime(
-    isoStr
-  ) {
-    if (!isoStr) return '-';
-
-    try {
-      const date =
-        new Date(isoStr);
-
-      if (isNaN(date.getTime())) {
-        return isoStr;
-      }
-
-      return date.toLocaleDateString(
-        undefined,
-        {
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit'
-        }
-      );
-    } catch (e) {
-      return isoStr;
-    }
-  }
-
-  formatDate(
-    isoStr
-  ) {
-    if (!isoStr) return '-';
-
-    try {
-      const date =
-        new Date(isoStr);
-
-      if (isNaN(date.getTime())) {
-        return isoStr;
-      }
-
-      return date.toLocaleDateString(
-        undefined,
-        {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        }
-      );
-    } catch (e) {
-      return isoStr;
+      return url.href;
+    } catch {
+      return null;
     }
   }
 
   getNowLocalIso() {
-    const date = new Date();
+    const date =
+      new Date();
 
     date.setMinutes(
       date.getMinutes() -
@@ -2883,10 +2696,12 @@ class App {
   getFutureLocalIso(
     daysAhead = 1
   ) {
-    const date = new Date();
+    const date =
+      new Date();
 
     date.setDate(
-      date.getDate() + daysAhead
+      date.getDate() +
+      daysAhead
     );
 
     date.setHours(
@@ -2906,51 +2721,59 @@ class App {
       .slice(0, 16);
   }
 
-  sanitizeExternalUrl(
-    value
-  ) {
-    if (
-      !value ||
-      typeof value !== 'string'
-    ) {
-      return null;
+  formatDateTime(value) {
+    if (!value) return '-';
+
+    const date =
+      new Date(value);
+
+    if (isNaN(date.getTime())) {
+      return value;
     }
 
-    const raw =
-      value.trim();
-
-    if (!raw) return null;
-
-    const candidate =
-      /^https?:\/\//i.test(raw)
-        ? raw
-        : `https://${raw}`;
-
-    try {
-      const parsed =
-        new URL(candidate);
-
-      if (
-        parsed.protocol !==
-          'https:' &&
-        parsed.protocol !==
-          'http:'
-      ) {
-        return null;
+    return date.toLocaleDateString(
+      undefined,
+      {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
       }
-
-      return parsed.href;
-    } catch (e) {
-      return null;
-    }
+    );
   }
 
-  escapeJsString(
-    value
-  ) {
-    return String(
-      value ?? ''
-    )
+  formatDate(value) {
+    if (!value) return '-';
+
+    const date =
+      new Date(value);
+
+    if (isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleDateString(
+      undefined,
+      {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      }
+    );
+  }
+
+  slugify(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(
+        /[^a-z0-9-_]/g,
+        ''
+      );
+  }
+
+  escapeJsString(value) {
+    return String(value ?? '')
       .replace(
         /\\/g,
         '\\\\'
@@ -2969,29 +2792,15 @@ class App {
       );
   }
 
-  slugify(
-    text
-  ) {
-    return (
-      text || ''
-    )
-      .toLowerCase()
-      .replace(
-        /\s+/g,
-        '-'
-      )
-      .replace(
-        /[^a-z0-9-_]/g,
-        ''
-      );
-  }
+  escapeHtml(value) {
+    if (
+      value === null ||
+      value === undefined
+    ) {
+      return '';
+    }
 
-  escapeHtml(
-    str
-  ) {
-    if (!str) return '';
-
-    return String(str)
+    return String(value)
       .replace(
         /&/g,
         '&amp;'
@@ -3015,27 +2824,70 @@ class App {
   }
 
   setElemText(
-    elemId,
-    text
+    elementId,
+    value
   ) {
-    const el =
+    const element =
       document.getElementById(
-        elemId
+        elementId
       );
 
-    if (el) {
-      el.textContent =
-        text !== undefined &&
-        text !== null
-          ? text
-          : '-';
-    }
+    if (!element) return;
+
+    element.textContent =
+      value !== undefined &&
+      value !== null
+        ? value
+        : '-';
+  }
+
+  showToast(
+    message,
+    type = 'info'
+  ) {
+    const container =
+      document.getElementById(
+        'toast-container'
+      );
+
+    if (!container) return;
+
+    const toast =
+      document.createElement(
+        'div'
+      );
+
+    toast.className =
+      `toast-item ${type}`;
+
+    toast.innerHTML = `
+      <span class="flex-1">
+        ${this.escapeHtml(message)}
+      </span>
+    `;
+
+    container.appendChild(
+      toast
+    );
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform =
+        'translateY(8px)';
+      toast.style.transition =
+        'all 0.2s ease-out';
+
+      setTimeout(
+        () => toast.remove(),
+        200
+      );
+    }, 4000);
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                              APP BOOTSTRAP                                 */
-/* -------------------------------------------------------------------------- */
+/* ============================================================================ */
+/* GLOBAL INSTANCE                                                              */
+/* ============================================================================ */
 
 window.app = new App();
 

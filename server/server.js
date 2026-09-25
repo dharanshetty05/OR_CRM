@@ -16,51 +16,28 @@ const FRONTEND_FILES = new Set([
     'config.js',
 ]);
 
-let healthStatus = 'starting';
-let loadInFlight = null;
+let isReady = false;
+let hasError = false;
 
 function getHealthPayload() {
     return {
-        status: healthStatus,
-        ready: healthStatus === 'ready'
+        status: isReady ? 'ready' : (hasError ? 'error' : 'starting'),
+        ready: isReady
     };
 }
 
-function hasWarmCache() {
-    return leadsRouter.getCache() !== null && activitiesRouter.getCache() !== null;
-}
-
-async function loadCachesFromSheets() {
-    await checkSheetsExist();
-    await Promise.all([
-        leadsRouter.reloadFromSheets(),
-        activitiesRouter.reloadFromSheets()
-    ]);
-}
-
 async function runCacheLoad() {
-    if (loadInFlight) {
-        await loadInFlight;
-        if (healthStatus !== 'ready') {
-            throw new Error('Google Sheets is unavailable');
-        }
-        return;
-    }
-
-    loadInFlight = (async () => {
-        await loadCachesFromSheets();
-        healthStatus = 'ready';
-    })();
-
     try {
-        await loadInFlight;
+        await checkSheetsExist();
+        await Promise.all([
+            leadsRouter.reloadFromSheets(),
+            activitiesRouter.reloadFromSheets()
+        ]);
+        isReady = true;
+        hasError = false;
     } catch (error) {
-        if (!hasWarmCache()) {
-            healthStatus = 'error';
-        }
+        hasError = true;
         throw error;
-    } finally {
-        loadInFlight = null;
     }
 }
 

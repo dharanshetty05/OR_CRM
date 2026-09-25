@@ -42,14 +42,17 @@
   <!-- Startup Loading Overlay -->
   <div id="app-loading-overlay" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6">
     <div class="flex flex-col items-center max-w-sm text-center">
-      <div class="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-md mb-4 animate-pulse">
+      <div
+        class="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-md mb-4 animate-pulse">
         SWL
       </div>
       <h3 class="text-lg font-bold text-neutral-900 mb-1">ScaleWithLakshya CRM</h3>
       <p id="app-loading-text" class="text-xs text-neutral-500 font-medium flex items-center justify-center gap-2">
         <svg id="app-loading-spinner" class="w-4 h-4 animate-spin text-brand-600" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
         </svg>
         <span>Google Sheets is connecting...</span>
       </p>
@@ -87,7 +90,8 @@
         <nav class="p-3 space-y-1">
           <button id="nav-dashboard" onclick="app.switchView('dashboard')"
             class="nav-item w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
-            <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round"
                 d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
@@ -97,7 +101,8 @@
           <button id="nav-leads" onclick="app.switchView('leads')"
             class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <div class="flex items-center gap-3">
-              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round"
                   d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -110,7 +115,8 @@
           <button id="nav-followups" onclick="app.switchView('followups')"
             class="nav-item w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md text-neutral-700 hover:bg-neutral-100 transition-colors">
             <div class="flex items-center gap-3">
-              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg class="w-4 h-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>Follow-ups</span>
@@ -134,24 +140,29 @@
     </aside>
 
     <!-- Mobile Navigation Bar -->
-    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex justify-around py-2 z-30">
-      <button onclick="app.switchView('dashboard')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
+    <div
+      class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 flex justify-around py-2 z-30">
+      <button onclick="app.switchView('dashboard')"
+        class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
         <span>Dashboard</span>
       </button>
-      <button onclick="app.switchView('leads')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
+      <button onclick="app.switchView('leads')"
+        class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
         <span>Leads</span>
       </button>
-      <button onclick="app.switchView('followups')" class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
+      <button onclick="app.switchView('followups')"
+        class="flex flex-col items-center text-xs text-neutral-600 hover:text-brand-600">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>Follow-ups</span>
       </button>
@@ -187,20 +198,18 @@
         <!-- Primary Metrics Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
           <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Leads</span>
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total
+              Leads</span>
             <span id="metric-total-leads" class="text-xl font-bold text-neutral-900">0</span>
           </div>
-          <div onclick="app.goToReachedToday()" title="View leads reached today"
-            class="metric-card-clickable bg-white p-3.5 rounded-xl border border-brand-200 bg-brand-50/20 shadow-sm cursor-pointer">
-            <span class="text-[11px] font-semibold text-brand-700 uppercase tracking-wider block mb-1">Reached Today</span>
-            <span id="metric-reached-today" class="text-xl font-bold text-brand-700">0</span>
-          </div>
           <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total Touchpoints</span>
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Total
+              Touchpoints</span>
             <span id="metric-total-touchpoints" class="text-xl font-bold text-neutral-900">0</span>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-sm">
-            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Not Contacted</span>
+            <span class="text-[11px] font-medium text-neutral-500 uppercase tracking-wider block mb-1">Not
+              Contacted</span>
             <span id="metric-not-contacted" class="text-xl font-bold text-neutral-900">0</span>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-purple-200 bg-purple-50/20 shadow-sm">
@@ -222,7 +231,8 @@
             <span id="metric-due-today" class="text-xl font-bold text-amber-700">0</span>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-sm">
-            <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block mb-1">Calls Booked</span>
+            <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block mb-1">Calls
+              Booked</span>
             <span id="metric-calls-booked" class="text-xl font-bold text-emerald-700">0</span>
           </div>
           <div class="bg-white p-3.5 rounded-xl border border-emerald-300 bg-emerald-100/30 shadow-sm">
@@ -238,7 +248,8 @@
             <span id="daily-progress-label" class="text-xs font-semibold text-neutral-600">— / 20 reached today</span>
           </div>
           <div class="w-full h-2.5 bg-neutral-100 rounded-full overflow-hidden">
-            <div id="daily-progress-bar-fill" class="h-full bg-brand-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+            <div id="daily-progress-bar-fill" class="h-full bg-brand-600 rounded-full transition-all duration-300"
+              style="width: 0%"></div>
           </div>
         </div>
 
@@ -317,18 +328,21 @@
             <select id="filter-status" onchange="app.handleFilterChange()"
               class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Statuses</option>
+              <option value="NEW_LEAD">NEW_LEAD</option>
+              <option value="DM_SENT">DM_SENT</option>
+              <option value="SEEN">SEEN</option>
+              <option value="REPLIED">REPLIED</option>
+              <option value="CONVO">CONVO</option>
+              <option value="CALL_BOOKED">CALL_BOOKED</option>
+              <option value="NOT_INTERESTED">NOT_INTERESTED</option>
+              <option value="WON">WON</option>
+              <option value="LOST">LOST</option>
             </select>
 
             <!-- Niche Filter -->
             <select id="filter-niche" onchange="app.handleFilterChange()"
               class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
               <option value="">All Niches</option>
-            </select>
-
-            <!-- Lead Source Filter -->
-            <select id="filter-source" onchange="app.handleFilterChange()"
-              class="text-xs bg-neutral-50 border border-neutral-300 rounded-md px-2.5 py-1.5 text-neutral-700 focus:outline-none focus:ring-1 focus:ring-brand-500">
-              <option value="">All Sources</option>
             </select>
 
             <!-- Follow-up State Filter -->
@@ -359,7 +373,8 @@
         <div class="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden flex-1 flex flex-col">
           <div class="overflow-x-auto flex-1">
             <table class="min-w-full divide-y divide-neutral-200 text-left text-sm">
-              <thead class="bg-neutral-50 text-xs font-semibold text-neutral-500 uppercase tracking-wider sticky top-0 z-10">
+              <thead
+                class="bg-neutral-50 text-xs font-semibold text-neutral-500 uppercase tracking-wider sticky top-0 z-10">
                 <tr>
                   <th scope="col" class="px-5 py-3.5">Business</th>
                   <th scope="col" class="px-4 py-3.5">Location</th>
@@ -367,7 +382,7 @@
                   <th scope="col" class="px-4 py-3.5">Instagram / Outreach</th>
                   <th scope="col" class="px-4 py-3.5">Status</th>
                   <th scope="col" class="px-4 py-3.5">Next Follow-up</th>
-                  <th scope="col" class="px-4 py-3.5">Last Contacted</th>
+                  <th scope="col" class="px-4 py-3.5">DM Sent Date & Time</th>
                 </tr>
               </thead>
               <tbody id="leads-table-body" class="divide-y divide-neutral-200 bg-white">
@@ -377,7 +392,8 @@
           </div>
 
           <!-- Table Footer Info -->
-          <div class="p-3.5 border-t border-neutral-200 bg-neutral-50 text-xs text-neutral-500 flex justify-between items-center">
+          <div
+            class="p-3.5 border-t border-neutral-200 bg-neutral-50 text-xs text-neutral-500 flex justify-between items-center">
             <span id="leads-table-summary">Showing 0 leads</span>
             <span class="text-neutral-400">Click any row to open lead profile & DM touchpoints</span>
           </div>
@@ -404,7 +420,8 @@
                 <span class="w-2 h-2 rounded-full bg-red-500"></span>
                 <h3 class="text-sm font-bold text-red-700 uppercase tracking-wide">Overdue</h3>
               </div>
-              <span id="badge-overdue-count" class="text-xs bg-red-100 text-red-800 font-semibold px-2.5 py-0.5 rounded-full">0</span>
+              <span id="badge-overdue-count"
+                class="text-xs bg-red-100 text-red-800 font-semibold px-2.5 py-0.5 rounded-full">0</span>
             </div>
             <div id="followups-list-overdue" class="divide-y divide-neutral-100 p-2">
               <!-- Dynamically populated -->
@@ -418,7 +435,8 @@
                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                 <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Due Today</h3>
               </div>
-              <span id="badge-today-count" class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-0.5 rounded-full">0</span>
+              <span id="badge-today-count"
+                class="text-xs bg-amber-100 text-amber-800 font-semibold px-2.5 py-0.5 rounded-full">0</span>
             </div>
             <div id="followups-list-today" class="divide-y divide-neutral-100 p-2">
               <!-- Dynamically populated -->
@@ -432,7 +450,8 @@
                 <span class="w-2 h-2 rounded-full bg-neutral-400"></span>
                 <h3 class="text-sm font-bold text-neutral-700 uppercase tracking-wide">Upcoming</h3>
               </div>
-              <span id="badge-upcoming-count" class="text-xs bg-neutral-200 text-neutral-700 font-semibold px-2.5 py-0.5 rounded-full">0</span>
+              <span id="badge-upcoming-count"
+                class="text-xs bg-neutral-200 text-neutral-700 font-semibold px-2.5 py-0.5 rounded-full">0</span>
             </div>
             <div id="followups-list-upcoming" class="divide-y divide-neutral-100 p-2">
               <!-- Dynamically populated -->
@@ -446,7 +465,8 @@
                 <span class="w-2 h-2 rounded-full bg-neutral-300"></span>
                 <h3 class="text-sm font-bold text-neutral-600 uppercase tracking-wide">No Follow-up Scheduled</h3>
               </div>
-              <span id="badge-none-count" class="text-xs bg-neutral-100 text-neutral-600 font-semibold px-2.5 py-0.5 rounded-full">0</span>
+              <span id="badge-none-count"
+                class="text-xs bg-neutral-100 text-neutral-600 font-semibold px-2.5 py-0.5 rounded-full">0</span>
             </div>
             <div id="followups-list-none" class="divide-y divide-neutral-100 p-2">
               <!-- Dynamically populated -->
@@ -477,7 +497,6 @@
                 <span id="drawer-lead-id" class="text-[11px] font-mono text-neutral-400">lead_id</span>
               </div>
               <h3 id="drawer-business-name" class="text-xl font-bold text-neutral-900">Business Name</h3>
-              <p id="drawer-contact-name" class="text-sm font-medium text-neutral-600">Contact Person</p>
             </div>
             <button onclick="app.closeLeadDrawer()"
               class="text-neutral-400 hover:text-neutral-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -492,16 +511,20 @@
           <div class="flex-1 overflow-y-auto p-6 space-y-6">
 
             <!-- Primary Instagram DM Action Bar -->
-            <div class="p-4 bg-purple-50/60 rounded-xl border border-purple-200 flex items-center justify-between gap-3">
+            <div
+              class="p-4 bg-purple-50/60 rounded-xl border border-purple-200 flex items-center justify-between gap-3">
               <div>
-                <span class="text-[11px] font-bold text-purple-700 uppercase tracking-wide block">Instagram DM Outreach</span>
-                <span id="drawer-instagram-handle" class="text-sm font-semibold text-neutral-900 block truncate">Not set</span>
+                <span class="text-[11px] font-bold text-purple-700 uppercase tracking-wide block">Instagram DM
+                  Outreach</span>
+                <span id="drawer-instagram-handle" class="text-sm font-semibold text-neutral-900 block truncate">Not
+                  set</span>
               </div>
               <div class="flex items-center gap-2">
                 <a id="btn-drawer-open-ig" href="#" target="_blank" rel="noopener noreferrer"
                   class="px-3.5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center gap-1.5">
                   <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    <path
+                      d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                   </svg>
                   <span>Open Instagram</span>
                 </a>
@@ -512,7 +535,7 @@
             <div class="flex items-center gap-2 flex-wrap" id="drawer-quick-actions">
               <!-- Dynamically populated by app.js depending on status -->
             </div>
-            
+
             <div class="flex items-center gap-2 flex-wrap">
               <button onclick="app.openSetFollowupModal()"
                 class="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-300 hover:bg-neutral-50 text-neutral-700 rounded-lg text-xs font-semibold transition-colors">
@@ -527,11 +550,13 @@
             <!-- Follow-up & Touchpoint Status Banner -->
             <div class="grid grid-cols-2 gap-3 p-3.5 bg-neutral-50 rounded-xl border border-neutral-200">
               <div>
-                <span class="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block">Next Follow-up</span>
+                <span class="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block">Next
+                  Follow-up</span>
                 <span id="drawer-next-followup" class="text-sm font-semibold text-neutral-900 mt-0.5 block">-</span>
               </div>
               <div>
-                <span class="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block">Last Contacted</span>
+                <span class="text-[11px] font-semibold text-neutral-500 uppercase tracking-wide block">DM Sent Date &
+                  Time</span>
                 <span id="drawer-last-contacted" class="text-sm font-medium text-neutral-700 mt-0.5 block">-</span>
               </div>
             </div>
@@ -574,7 +599,8 @@
             <div class="space-y-3 pt-2">
               <div class="flex items-center justify-between">
                 <h4 class="text-xs font-bold text-neutral-900 uppercase tracking-wider">Outreach & Activity History</h4>
-                <button onclick="app.openAddActivityModal()" class="text-xs font-semibold text-brand-600 hover:text-brand-700">+ Log Touchpoint</button>
+                <button onclick="app.openAddActivityModal()"
+                  class="text-xs font-semibold text-brand-600 hover:text-brand-700">+ Log Touchpoint</button>
               </div>
               <div id="drawer-activities-list" class="space-y-3">
                 <!-- Dynamically populated -->
@@ -591,14 +617,16 @@
     <!-- ==================================================================== -->
 
     <!-- Modal: Add Activity -->
-    <dialog id="modal-add-activity" class="rounded-xl p-0 w-full max-w-lg bg-white shadow-2xl border border-neutral-200">
+    <dialog id="modal-add-activity"
+      class="rounded-xl p-0 w-full max-w-lg bg-white shadow-2xl border border-neutral-200">
       <form method="dialog" onsubmit="app.submitAddActivity(event)" class="flex flex-col">
         <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
           <div>
             <h3 class="text-lg font-bold text-neutral-900">Log Outreach Touchpoint</h3>
             <p class="text-xs text-neutral-500">Record an Instagram DM or lead activity.</p>
           </div>
-          <button type="button" onclick="document.getElementById('modal-add-activity').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
+          <button type="button" onclick="document.getElementById('modal-add-activity').close()"
+            class="text-neutral-400 hover:text-neutral-600 p-1">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -614,13 +642,6 @@
                 <!-- Populated dynamically -->
               </select>
             </div>
-            <div>
-              <label for="act-channel" class="block text-xs font-semibold text-neutral-700 mb-1">Channel *</label>
-              <select id="act-channel" required
-                class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white">
-                <!-- Populated dynamically -->
-              </select>
-            </div>
           </div>
 
           <div>
@@ -631,7 +652,8 @@
 
           <div>
             <label for="act-summary" class="block text-xs font-semibold text-neutral-700 mb-1">Summary *</label>
-            <input type="text" id="act-summary" required placeholder="e.g. Sent initial Instagram DM regarding solar leads"
+            <input type="text" id="act-summary" required
+              placeholder="e.g. Sent initial Instagram DM regarding solar leads"
               class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none">
           </div>
 
@@ -652,20 +674,23 @@
           <button type="button" onclick="document.getElementById('modal-add-activity').close()"
             class="px-4 py-2 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-neutral-50">Cancel</button>
           <button type="submit" id="btn-submit-add-activity"
-            class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Log Activity</button>
+            class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors">Log
+            Activity</button>
         </div>
       </form>
     </dialog>
 
     <!-- Modal: Set Follow-up -->
-    <dialog id="modal-set-followup" class="rounded-xl p-0 w-full max-w-sm bg-white shadow-2xl border border-neutral-200">
+    <dialog id="modal-set-followup"
+      class="rounded-xl p-0 w-full max-w-sm bg-white shadow-2xl border border-neutral-200">
       <form method="dialog" onsubmit="app.submitSetFollowup(event)" class="flex flex-col">
         <div class="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
           <div>
             <h3 class="text-base font-bold text-neutral-900">Set Follow-up</h3>
             <p class="text-xs text-neutral-500">Pick a target date & time.</p>
           </div>
-          <button type="button" onclick="document.getElementById('modal-set-followup').close()" class="text-neutral-400 hover:text-neutral-600 p-1">
+          <button type="button" onclick="document.getElementById('modal-set-followup').close()"
+            class="text-neutral-400 hover:text-neutral-600 p-1">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -675,7 +700,8 @@
         <div class="p-5 space-y-4">
           <input type="hidden" id="set-followup-lead-id">
           <div>
-            <label for="set-followup-datetime" class="block text-xs font-semibold text-neutral-700 mb-1.5">Next Follow-up *</label>
+            <label for="set-followup-datetime" class="block text-xs font-semibold text-neutral-700 mb-1.5">Next
+              Follow-up *</label>
             <input type="datetime-local" id="set-followup-datetime" required
               class="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:outline-none text-sm">
           </div>

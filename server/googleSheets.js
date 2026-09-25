@@ -73,7 +73,7 @@ async function checkSheetsExist() {
 async function getRows(range) {
     const sheets = await getSheetsInstance();
     const spreadsheetId = getSpreadsheetId();
-    
+
     try {
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
@@ -88,7 +88,7 @@ async function getRows(range) {
 async function appendRow(range, values) {
     const sheets = await getSheetsInstance();
     const spreadsheetId = getSpreadsheetId();
-    
+
     try {
         await sheets.spreadsheets.values.append({
             spreadsheetId,
@@ -106,7 +106,7 @@ async function appendRow(range, values) {
 async function updateRow(range, values) {
     const sheets = await getSheetsInstance();
     const spreadsheetId = getSpreadsheetId();
-    
+
     try {
         await sheets.spreadsheets.values.update({
             spreadsheetId,
@@ -121,37 +121,9 @@ async function updateRow(range, values) {
     }
 }
 
-async function deleteRow(sheetId, startIndex, endIndex) {
-    const sheets = await getSheetsInstance();
-    const spreadsheetId = getSpreadsheetId();
-    
-    try {
-        await sheets.spreadsheets.batchUpdate({
-            spreadsheetId,
-            requestBody: {
-                requests: [
-                    {
-                        deleteDimension: {
-                            range: {
-                                sheetId: sheetId,
-                                dimension: 'ROWS',
-                                startIndex: startIndex,
-                                endIndex: endIndex
-                            }
-                        }
-                    }
-                ]
-            }
-        });
-    } catch (error) {
-        throw error;
-    }
-}
-
 module.exports = {
     checkSheetsExist,
     getRows,
     appendRow,
     updateRow,
-    deleteRow,
 };

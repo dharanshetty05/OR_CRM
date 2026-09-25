@@ -1,111 +1,172 @@
 /**
- * ScaleWithLakshya Outreach CRM - API Repository Service
- * Talks to the Express backend over same-origin /api routes.
+ * ScaleWithLakshya Outreach CRM
+ * API Repository Service
+ *
+ * Frontend <-> Express API <-> Google Sheets
  */
 
 class APIService {
+
   constructor() {
-    this.baseUrl = String(window.CONFIG?.API_BASE_URL || '/api').replace(/\/$/, '');
+    this.baseUrl = String(
+      window.CONFIG?.API_BASE_URL || '/api'
+    ).replace(/\/$/, '');
   }
+
+  /* -------------------------------------------------------------------------- */
+  /*                                HTTP                                        */
+  /* -------------------------------------------------------------------------- */
 
   async _fetch(endpoint, options = {}) {
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.headers || {})
+      const response = await fetch(
+        `${this.baseUrl}${endpoint}`,
+        {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
         }
-      });
-      
+      );
+
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
+        const errorBody = await response
+          .json()
+          .catch(() => ({}));
+
         if (response.status === 503) {
-          throw new Error(err.error || 'Google Sheets is unavailable');
+          throw new Error(
+            errorBody.error ||
+            'Google Sheets is unavailable'
+          );
         }
-        throw new Error(err.error || `Could not complete the request (${response.status})`);
+
+        throw new Error(
+          errorBody.error ||
+          `Could not complete the request (${response.status})`
+        );
       }
-      
+
       return await response.json();
+
     } catch (error) {
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+
+      if (
+        error.name === 'TypeError' &&
+        error.message.includes('Failed to fetch')
+      ) {
         throw new Error('Could not connect to MyCRM');
       }
+
       throw error;
     }
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                                HEALTH                                       */
+  /* -------------------------------------------------------------------------- */
+
   async getHealth() {
     try {
-      const response = await fetch(`${this.baseUrl}/health`);
+      const response = await fetch(
+        `${this.baseUrl}/health`
+      );
+
       if (!response.ok) {
         throw new Error('Could not connect to MyCRM');
       }
+
       return await response.json();
+
     } catch (error) {
-      if (error.message === 'Could not connect to MyCRM') throw error;
       throw new Error('Could not connect to MyCRM');
     }
   }
 
   async waitUntilReady(onStatus) {
-    // NOTE: this used to give up after ~15 attempts (~35s total). Loading a
-    // large Google Sheet (or a slow/cold network) can easily take longer
-    // than that, so the poll would abandon a load that was still legitimately
-    // in progress on the backend. The result: the dashboard would sit on a
-    // stale "Connecting..." state and only pick up the data once the user
-    // manually clicked Refresh (which re-awaits the same in-flight load on
-    // the server and succeeds). Fixing the actual cause: keep polling as
-    // long as the backend reports "starting" (never give up on a load that
-    // is still happening), and only stop early on an explicit "error" status
-    // or a genuine network failure. A very generous overall ceiling (10
-    // minutes) exists purely as a last-resort safety valve, not as the
-    // normal exit path.
+
     let lastError = null;
     let delayMs = 0;
     let networkFailures = 0;
-    const startedAt = Date.now();
-    const MAX_WAIT_MS = 10 * 60 * 1000;
 
-    while (Date.now() - startedAt < MAX_WAIT_MS) {
+    const startedAt = Date.now();
+
+    const MAX_WAIT_MS = 10 * 1000;
+
+    while (
+      Date.now() - startedAt < MAX_WAIT_MS
+    ) {
+
       if (delayMs) {
-        await new Promise(r => setTimeout(r, delayMs));
+        await new Promise(resolve =>
+          setTimeout(resolve, delayMs)
+        );
       }
+
       try {
+
         const health = await this.getHealth();
+
         networkFailures = 0;
-        if (typeof onStatus === 'function') onStatus(health);
-        if (health.status === 'ready' && health.ready) {
+
+        if (typeof onStatus === 'function') {
+          onStatus(health);
+        }
+
+        if (
+          health.status === 'ready' &&
+          health.ready
+        ) {
           return health;
         }
+
         if (health.status === 'error') {
-          throw new Error('Google Sheets is unavailable');
+          throw new Error(
+            'Google Sheets is unavailable'
+          );
         }
-        lastError = new Error('Google Sheets is connecting...');
-      } catch (e) {
-        lastError = e;
-        if (e.message === 'Google Sheets is unavailable') throw e;
-        // A handful of consecutive network failures (server not accepting
-        // connections yet) is expected right after the launcher starts the
-        // process - keep retrying. Only bubble up "Could not connect" if it
-        // persists well past a normal startup window.
-        if (e.message === 'Could not connect to MyCRM') {
+
+        lastError = new Error(
+          'Google Sheets is connecting...'
+        );
+
+      } catch (error) {
+
+        lastError = error;
+
+        if (
+          error.message ===
+          'Google Sheets is unavailable'
+        ) {
+          throw error;
+        }
+
+        if (
+          error.message ===
+          'Could not connect to MyCRM'
+        ) {
           networkFailures++;
-          if (networkFailures >= 40) throw e; // ~ a couple minutes of failures
+
+          if (networkFailures >= 40) {
+            throw error;
+          }
         }
       }
-      delayMs = delayMs === 0 ? 400 : Math.min(3000, Math.round(delayMs * 1.5));
+
+      delayMs =
+        delayMs === 0
+          ? 400
+          : Math.min(
+            3000,
+            Math.round(delayMs * 1.5)
+          );
     }
 
-    throw lastError || new Error('Could not connect to MyCRM');
-  }
-
-  async refreshFromSheets() {
-    const payload = await this._fetch('/refresh', { method: 'POST' });
-    return {
-      leads: (payload.leads || []).map(this._mapBackendLeadToFrontend),
-      activities: (payload.activities || []).map(this._mapBackendActivityToFrontend)
-    };
+    throw (
+      lastError ||
+      new Error('Could not connect to MyCRM')
+    );
   }
 
   async init() {
@@ -113,197 +174,364 @@ class APIService {
   }
 
   /* -------------------------------------------------------------------------- */
-  /*                            LEADS OPERATIONS                                */
+  /*                                  REFRESH                                    */
+  /* -------------------------------------------------------------------------- */
+
+  async refreshFromSheets() {
+
+    const payload = await this._fetch(
+      '/refresh',
+      {
+        method: 'POST'
+      }
+    );
+
+    return {
+      leads: (payload.leads || [])
+        .map(this._mapBackendLeadToFrontend),
+
+      activities: (payload.activities || [])
+        .map(this._mapBackendActivityToFrontend)
+    };
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                                  LEADS                                      */
   /* -------------------------------------------------------------------------- */
 
   async getAllLeads() {
+
     const leads = await this._fetch('/leads');
-    // Map backend to frontend schema (most fields align because backend was updated)
-    return leads.map(this._mapBackendLeadToFrontend);
+
+    return leads.map(
+      this._mapBackendLeadToFrontend
+    );
   }
 
-  async getLeadById(leadId) {
-    const lead = await this._fetch(`/leads/${leadId}`);
-    return this._mapBackendLeadToFrontend(lead);
-  }
+  async updateLead(
+    leadId,
+    updatedFields,
+    existingLeads = []
+  ) {
 
-  async updateLead(leadId, updatedFields, existingLeads = []) {
-    // We need the existing lead for duplicate checks
-    let existing = existingLeads.find(l => l.lead_id === leadId);
+    let existing =
+      existingLeads.find(
+        lead => lead.lead_id === leadId
+      );
+
     if (!existing) {
-      existing = await this.getLeadById(leadId);
-    }
-    if (!existing) {
-      throw new Error(`Lead with ID "${leadId}" was not found.`);
-    }
-
-    const merged = { ...existing, ...updatedFields };
-
-    const dupCheck = this.findDuplicate(merged, existingLeads, leadId);
-    if (dupCheck.duplicate) {
-      throw new Error(dupCheck.reason);
+      throw new Error(
+        `Lead with ID "${leadId}" was not found.`
+      );
     }
 
-    merged.updated_at = new Date().toISOString();
+    const merged = {
+      ...existing,
+      ...updatedFields
+    };
 
-    const payload = this._mapFrontendLeadToBackend(merged);
-    const updated = await this._fetch(`/leads/${leadId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload)
-    });
+    merged.lead_id = leadId;
 
-    return this._mapBackendLeadToFrontend(updated);
+    /*
+     * Send only fields belonging to the
+     * current LEADS schema.
+     */
+    const payload =
+      this._mapFrontendLeadToBackend(
+        merged
+      );
+
+    const updated =
+      await this._fetch(
+        `/leads/${encodeURIComponent(leadId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        }
+      );
+
+    return this._mapBackendLeadToFrontend(
+      updated
+    );
   }
 
   /* -------------------------------------------------------------------------- */
-  /*                          ACTIVITY OPERATIONS                               */
+  /*                                ACTIVITIES                                   */
   /* -------------------------------------------------------------------------- */
 
   async getAllActivities() {
-    const activities = await this._fetch('/activities');
-    return activities.map(this._mapBackendActivityToFrontend);
+
+    const activities =
+      await this._fetch('/activities');
+
+    return activities.map(
+      this._mapBackendActivityToFrontend
+    );
   }
 
-  async addActivity(activityData, currentLead = null) {
-    const payload = this._mapFrontendActivityToBackend(activityData);
-    
-    const activityRecord = await this._fetch('/activities', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+  async addActivity(
+    activityData,
+    currentLead = null
+  ) {
 
-    const frontendActivity = this._mapBackendActivityToFrontend(activityRecord);
+    const payload =
+      this._mapFrontendActivityToBackend(
+        activityData
+      );
+
+    const activityRecord =
+      await this._fetch(
+        '/activities',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      );
+
+    const frontendActivity =
+      this._mapBackendActivityToFrontend(
+        activityRecord
+      );
 
     let updatedLead = null;
-    const isContactTouchpoint = window.CONFIG?.CONTACT_ACTIVITY_TYPES?.includes(activityData.activity_type);
 
-    if (isContactTouchpoint && currentLead) {
+    /*
+     * Contact activities update the lead's
+     * Last Activity and status.
+     */
+    const contactTypes =
+      window.CONFIG?.CONTACT_ACTIVITY_TYPES || [];
+
+    const isContactTouchpoint =
+      contactTypes.includes(
+        activityData.activity_type
+      );
+
+    if (
+      isContactTouchpoint &&
+      currentLead
+    ) {
+
       try {
-        const now = activityData.activity_at || new Date().toISOString();
-        updatedLead = await this.updateLead(currentLead.lead_id, {
-          last_contacted_at: now,
-          status: (currentLead.status === 'NOT CONTACTED' || currentLead.status === 'New' || currentLead.status === 'Researching')
-            ? 'DM SENT'
-            : currentLead.status
-        });
-      } catch (err) {
-        return {
-          success: true,
-          partialSuccess: true,
-          activity: frontendActivity,
-          warning: "Activity was saved, but Last Contacted could not be updated."
-        };
+
+        const now =
+          activityData.activity_at ||
+          new Date().toISOString();
+
+        const currentStatus =
+          currentLead.status;
+
+        const newStatus =
+          (
+            currentStatus === 'NEW_LEAD'
+          )
+            ? 'DM_SENT'
+            : currentStatus;
+
+        updatedLead =
+          await this.updateLead(
+            currentLead.lead_id,
+            {
+              dm_sent_date_time: now,
+              status: newStatus
+            }
+          );
+
+      } catch (error) {
+
+        console.error(
+          'Activity saved but lead update failed:',
+          error
+        );
       }
-    }
-
-    return { success: true, activity: frontendActivity, updatedLead };
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                            UTILITY FUNCTIONS                               */
-  /* -------------------------------------------------------------------------- */
-
-  findDuplicate(newLeadData, existingLeads, excludeLeadId = null) {
-    const normDomain = this.normalizeDomain(newLeadData.website);
-    const placeId = (newLeadData.google_place_id || '').trim();
-    const bizLoc = (newLeadData.business_name || '').trim().toLowerCase() + '::' + (newLeadData.location || '').trim().toLowerCase();
-
-    for (const lead of existingLeads) {
-      if (excludeLeadId && lead.lead_id === excludeLeadId) continue;
-
-      if (normDomain && lead.normalized_domain && lead.normalized_domain === normDomain) {
-        return { duplicate: true, reason: `Duplicate website domain (${normDomain}) with existing lead: "${lead.business_name}"` };
-      }
-      if (newLeadData.business_name && newLeadData.location) {
-        const existingBizLoc = (lead.business_name || '').trim().toLowerCase() + '::' + (lead.location || '').trim().toLowerCase();
-        if (bizLoc === existingBizLoc) {
-          return { duplicate: true, reason: `Duplicate Business Name & Location with existing lead: "${lead.business_name}"` };
-        }
-      }
-    }
-    return { duplicate: false };
-  }
-
-  normalizeDomain(website) {
-    if (!website || typeof website !== 'string') return '';
-    let domain = website.trim().toLowerCase();
-    domain = domain.replace(/^https?:\/\//i, '');
-    domain = domain.replace(/^www\./i, '');
-    domain = domain.split(/[/?#:]/)[0];
-    domain = domain.replace(/[\/.]+$/, '');
-    return domain;
-  }
-  
-  _mapBackendLeadToFrontend = (b) => {
-    const mapped = { ...b };
-    
-    if (b.id) { mapped.lead_id = b.id; delete mapped.id; }
-    if (b.created_at) { mapped.date_added = b.created_at; delete mapped.created_at; }
-    if (b.last_contacted) { mapped.last_contacted_at = b.last_contacted; delete mapped.last_contacted; }
-    if (b.next_followup) { mapped.next_follow_up_at = b.next_followup; delete mapped.next_followup; }
-    
-    // Auto-generate normalized fields for frontend
-    if (!mapped.normalized_domain) { mapped.normalized_domain = this.normalizeDomain(mapped.website) || ''; }    
-    return mapped;
-  }
-
-  _mapFrontendLeadToBackend = (f) => {
-    const mapped = { ...f };
-    
-    if (f.lead_id) { mapped.id = f.lead_id; delete mapped.lead_id; }
-    if (f.date_added) { mapped.created_at = f.date_added; delete mapped.date_added; }
-    if (f.last_contacted_at) { mapped.last_contacted = f.last_contacted_at; delete mapped.last_contacted_at; }
-    if (f.next_follow_up_at) { mapped.next_followup = f.next_follow_up_at; delete mapped.next_follow_up_at; }
-    
-    // Remove normalized fields before sending to backend
-    delete mapped.normalized_domain;
-    delete mapped.normalized_phone;
-    
-    return mapped;
-  }
-
-  _mapBackendActivityToFrontend = (b) => {
-    let extra = {};
-    try {
-      if (b.note && b.note.startsWith('{')) {
-        extra = JSON.parse(b.note);
-      } else {
-        extra.notes = b.note;
-      }
-    } catch (e) {
-      extra.notes = b.note;
     }
 
     return {
-      activity_id: b.id,
-      lead_id: b.lead_id,
-      activity_at: b.date,
-      activity_type: b.type,
-      channel: extra.channel || 'Instagram',
-      summary: extra.summary || '',
-      outcome: extra.outcome || '',
-      notes: extra.notes || ''
+      success: true,
+      activity: frontendActivity,
+      updatedLead
     };
   }
 
-  _mapFrontendActivityToBackend = (f) => {
-    const extra = {
-      channel: f.channel,
-      summary: f.summary,
-      outcome: f.outcome,
-      notes: f.notes
-    };
+  /* -------------------------------------------------------------------------- */
+  /*                            LEAD MAPPING                                     */
+  /* -------------------------------------------------------------------------- */
+
+  _mapBackendLeadToFrontend = (backendLead) => {
 
     return {
-      lead_id: f.lead_id,
-      date: f.activity_at || new Date().toISOString(),
-      type: f.activity_type,
-      note: JSON.stringify(extra)
+      lead_id:
+        backendLead.id || '',
+
+      business_name:
+        backendLead.business_name || '',
+
+      location:
+        backendLead.location || '',
+
+      niche:
+        backendLead.niche || '',
+
+      instagram_url:
+        backendLead.instagram_url || '',
+
+      website:
+        backendLead.website || '',
+
+      opportunity_score:
+        backendLead.opportunity_score || '',
+
+      status:
+        backendLead.status || '',
+
+      next_follow_up_at:
+        backendLead.next_followup || '',
+
+      follow_up_count:
+        backendLead.follow_up_count || '',
+
+      dm_sent_date_time:
+        backendLead.dm_sent_date_time || '',
+
+      reply_date:
+        backendLead.reply_date || '',
+
+      call_booked_date:
+        backendLead.call_booked_date || '',
+
+      outcome:
+        backendLead.outcome || '',
+
+      notes:
+        backendLead.notes || '',
+
+      updated_at:
+        backendLead.updated_at || ''
     };
-  }
+  };
+
+  _mapFrontendLeadToBackend = (frontendLead) => {
+
+    return {
+      business_name:
+        frontendLead.business_name || '',
+
+      location:
+        frontendLead.location || '',
+
+      niche:
+        frontendLead.niche || '',
+
+      instagram_url:
+        frontendLead.instagram_url || '',
+
+      website:
+        frontendLead.website || '',
+
+      opportunity_score:
+        frontendLead.opportunity_score || '',
+
+      status:
+        frontendLead.status || '',
+
+      next_followup:
+        frontendLead.next_follow_up_at || '',
+
+      follow_up_count:
+        frontendLead.follow_up_count || '',
+
+      dm_sent_date_time:
+        frontendLead.dm_sent_date_time || '',
+
+      reply_date:
+        frontendLead.reply_date || '',
+
+      call_booked_date:
+        frontendLead.call_booked_date || '',
+
+      outcome:
+        frontendLead.outcome || '',
+
+      notes:
+        frontendLead.notes || '',
+
+      updated_at:
+        frontendLead.updated_at || ''
+    };
+  };
+
+  /* -------------------------------------------------------------------------- */
+  /*                          ACTIVITY MAPPING                                   */
+  /* -------------------------------------------------------------------------- */
+
+  _mapBackendActivityToFrontend =
+    (backendActivity) => {
+
+      return {
+
+        activity_id:
+          backendActivity.id || '',
+
+        lead_id:
+          backendActivity.lead_id || '',
+
+        activity_type:
+          backendActivity.type || '',
+
+        activity_at:
+          backendActivity.date || '',
+
+        follow_up_number:
+          backendActivity.follow_up_number || '',
+
+        message:
+          backendActivity.message || '',
+
+        outcome:
+          backendActivity.outcome || '',
+
+        notes:
+          backendActivity.notes || '',
+
+        created_at:
+          backendActivity.created_at || ''
+      };
+    };
+
+  _mapFrontendActivityToBackend =
+    (frontendActivity) => {
+
+      return {
+
+        lead_id:
+          frontendActivity.lead_id || '',
+
+        type:
+          frontendActivity.activity_type || '',
+
+        date:
+          frontendActivity.activity_at ||
+          new Date().toISOString(),
+
+        follow_up_number:
+          frontendActivity.follow_up_number || '',
+
+        message:
+          frontendActivity.message || '',
+
+        outcome:
+          frontendActivity.outcome || '',
+
+        notes:
+          frontendActivity.notes || ''
+      };
+    };
 }
 
-// Export singleton instance for browser scope to replace dbService seamlessly
+/* -------------------------------------------------------------------------- */
+/*                              EXPORT                                         */
+/* -------------------------------------------------------------------------- */
+
 if (typeof window !== 'undefined') {
   window.dbService = new APIService();
 }

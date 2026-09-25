@@ -95,12 +95,12 @@ dialog[open]::backdrop {
 }
 
 /* Primary workflow status colors */
-.status-not-contacted, .status-new, .status-researching, .status-ready-to-contact { background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
+.status-new-lead, .status-new, .status-researching, .status-ready-to-contact { background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb; }
 .status-dm-sent, .status-contacted, .status-follow-up { background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
-.status-replied { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.status-seen, .status-replied, .status-convo { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
 .status-call-booked, .status-call-completed, .status-proposal-sent { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .status-won { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; font-weight: 700; }
-.status-lost { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+.status-not-interested, .status-lost { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 
 /* Follow-up State Tag */
 .followup-overdue {
@@ -213,18 +213,6 @@ input:focus-visible {
   outline-offset: 1px;
 }
 
-/* Loading shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 0.25rem;
-}
 
 /* App Loading Overlay transition */
 #app-loading-overlay {

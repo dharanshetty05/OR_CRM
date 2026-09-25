@@ -19,12 +19,14 @@ const CONFIG = {
   // indicator on the dashboard. Not a settings system - just a constant.
   DAILY_OUTREACH_TARGET: 20,
 
-  // Primary Outreach Statuses
   STATUSES: [
-    'NOT CONTACTED',
-    'DM SENT',
+    'NEW_LEAD',
+    'DM_SENT',
+    'SEEN',
     'REPLIED',
-    'CALL BOOKED',
+    'CONVO',
+    'CALL_BOOKED',
+    'NOT_INTERESTED',
     'WON',
     'LOST'
   ],
@@ -55,22 +57,6 @@ const CONFIG = {
     'Call Completed',
     'Proposal Sent'
   ],
-
-  CHANNELS: [
-    'Instagram',
-    'Website',
-    'Other'
-  ],
-
-  LEAD_SOURCES: [
-    'Manual',
-    'Instagram',
-    'Apify',
-    'n8n',
-    'Google Maps',
-    'Referral',
-    'Other'
-  ]
 };
 
 if (typeof window !== 'undefined') {
